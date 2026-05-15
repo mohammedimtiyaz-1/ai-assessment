@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { signIn } from "next-auth/react";
+import { useState, Suspense, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,20 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.role) {
+      const target = ["teacher", "admin", "super_admin"].includes(session.user.role)
+        ? "/dashboard"
+        : "/student/dashboard";
+      router.push(callbackUrl.startsWith("/") ? callbackUrl : target);
+    }
+  }, [status, session, router, callbackUrl]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,17 +37,13 @@ function LoginForm() {
       redirect: false,
       email,
       password,
-      callbackUrl,
     });
     setLoading(false);
     if (res?.error) {
       setError("Invalid email or password");
       return;
     }
-    if (res?.url) {
-      router.push(res.url);
-      router.refresh();
-    }
+    router.refresh();
   }
 
   return (

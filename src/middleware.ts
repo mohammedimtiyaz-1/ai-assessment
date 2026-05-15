@@ -12,11 +12,18 @@ export default auth((req) => {
   const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
   const isApiRoute = nextUrl.pathname.startsWith("/api");
 
-  if (isApiAuthRoute || isApiRoute || isPublicPage || isPublicLink) {
+  if (isApiAuthRoute || isApiRoute || isPublicLink) {
     return NextResponse.next();
   }
 
-  if (!isLoggedIn) {
+  if (isLoggedIn && ["/login", "/signup", "/forgot-password"].includes(nextUrl.pathname)) {
+    const redirectTo = ["teacher", "admin", "super_admin"].includes(userRole || "")
+      ? "/dashboard"
+      : "/student/dashboard";
+    return NextResponse.redirect(new URL(redirectTo, nextUrl));
+  }
+
+  if (!isLoggedIn && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 

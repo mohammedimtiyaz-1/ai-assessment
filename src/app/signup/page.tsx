@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,16 @@ export default function SignupPage() {
         setLoading(false);
         return;
       }
-      router.push("/login");
+      const signInRes = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+      if (signInRes?.error) {
+        router.push("/login");
+        return;
+      }
+      router.push("/student/dashboard");
     } catch {
       setError("Something went wrong");
       setLoading(false);
