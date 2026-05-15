@@ -24,17 +24,20 @@ AI-powered learning and assessment platform built with Next.js 14, Tailwind CSS,
 # 1. Install dependencies
 pnpm install
 
-# 2. Configure environment
+# 2. Start Postgres (optional — skip if you have one)
+docker compose up -d
+
+# 3. Configure environment
 cp .env.example .env.local
 # Edit .env.local with your DATABASE_URL, NEXTAUTH_SECRET, etc.
 
-# 3. Run migrations
+# 4. Run migrations
 pnpm migrate:up
 
-# 4. (Optional) Seed dev data
+# 5. (Optional) Seed dev data
 pnpm run seed:development
 
-# 5. Start dev server
+# 6. Start dev server
 pnpm dev
 ```
 

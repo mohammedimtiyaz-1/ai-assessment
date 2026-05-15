@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { query } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { randomUUID } from "crypto";
 
 const schema = z.object({
@@ -12,6 +13,12 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for") || "anonymous";
+  const limit = rateLimit(`register:${ip}`, 5, 60000);
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.retryAfter ?? 60);
+  }
+
   try {
     const body = await req.json();
     const parsed = schema.safeParse(body);
