@@ -18,6 +18,7 @@ interface Assessment {
 export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     fetch("/api/teacher/assessments")
@@ -28,6 +29,25 @@ export default function AssessmentsPage() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  async function createAssessment() {
+    const title = window.prompt("Assessment title:");
+    if (!title) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/teacher/assessments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAssessments((prev) => [{ id: data.id, title: data.title, status: data.status, created_at: new Date().toISOString() }, ...prev]);
+      }
+    } finally {
+      setCreating(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -44,9 +64,9 @@ export default function AssessmentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Assessments</h1>
-        <Button onClick={() => { /* create modal could go here */ }}>
+        <Button onClick={createAssessment} disabled={creating}>
           <Plus className="mr-2 h-4 w-4" />
-          Create
+          {creating ? "Creating..." : "Create"}
         </Button>
       </div>
 
