@@ -67,10 +67,10 @@ export default function ContentPage() {
           <Card key={item.id} className="flex flex-col">
             <CardContent className="p-5 flex-1 flex flex-col">
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
+                <Link href={`/student/content/${item.id}`} className="flex items-center gap-2 hover:text-primary transition-colors">
                   <BookOpen className="h-5 w-5 text-primary" />
                   <h3 className="font-semibold text-sm">{item.title}</h3>
-                </div>
+                </Link>
                 <Badge variant="secondary">{item.type}</Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-2">

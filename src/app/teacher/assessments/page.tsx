@@ -76,7 +76,9 @@ export default function AssessmentsPage() {
             <FileQuestion className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold">No assessments yet</h3>
             <p className="text-sm text-muted-foreground mt-2">Create your first assessment to share with students.</p>
-            <Button className="mt-4">Create assessment</Button>
+            <Button className="mt-4" onClick={createAssessment} disabled={creating}>
+              {creating ? "Creating..." : "Create assessment"}
+            </Button>
           </CardContent>
         </Card>
       )}

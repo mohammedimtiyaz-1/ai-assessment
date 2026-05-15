@@ -6,8 +6,19 @@ import { randomUUID } from "crypto";
 export const GET = auth(async (req) => {
   if (!req.auth?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userId = req.auth.user.id;
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+
+  if (id) {
+    const result = await query(
+      "SELECT id, title, type, storage_ref, created_at FROM content WHERE id = $1 AND owner_user_id = $2",
+      [id, userId]
+    );
+    return NextResponse.json({ content: result.rows });
+  }
+
   const result = await query(
-    "SELECT id, title, type, created_at FROM content WHERE owner_user_id = $1 ORDER BY created_at DESC",
+    "SELECT id, title, type, storage_ref, created_at FROM content WHERE owner_user_id = $1 ORDER BY created_at DESC",
     [userId]
   );
   return NextResponse.json({ content: result.rows });
