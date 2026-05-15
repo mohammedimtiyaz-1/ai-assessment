@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,7 +15,7 @@ interface ContentItem {
   type: string;
 }
 
-export default function QuizEntryPage() {
+function QuizEntryForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contentId = searchParams.get("contentId");
@@ -103,5 +103,20 @@ export default function QuizEntryPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function QuizEntryPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-40" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-32" />
+        ))}
+      </div>
+    }>
+      <QuizEntryForm />
+    </Suspense>
   );
 }

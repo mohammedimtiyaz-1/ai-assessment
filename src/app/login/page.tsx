@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GraduationCap, Loader2 } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
@@ -80,5 +80,27 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <div className="mb-8 flex items-center justify-center gap-2 font-bold text-2xl">
+            <GraduationCap className="h-8 w-8 text-primary" />
+            <span>AI Assessment</span>
+          </div>
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
