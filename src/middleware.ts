@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 
-export default auth((req) => {
+function getSessionToken(req: NextRequest): string | undefined {
+  const token = req.cookies.get("next-auth.session-token")?.value;
+  if (token) return token;
+  // For secure cookies (production)
+  return req.cookies.get("__Secure-next-auth.session-token")?.value;
+}
+
+export default function middleware(req: NextRequest) {
   const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
-  const userRole = req.auth?.user?.role;
+  const token = getSessionToken(req);
+  const isLoggedIn = !!token;
 
   const isPublicPage = ["/", "/login", "/signup", "/forgot-password"].includes(nextUrl.pathname);
   const isPublicLink = nextUrl.pathname.startsWith("/a/");
@@ -17,9 +23,7 @@ export default auth((req) => {
   }
 
   if (isLoggedIn && ["/login", "/signup", "/forgot-password"].includes(nextUrl.pathname)) {
-    const redirectTo = ["teacher", "admin", "super_admin"].includes(userRole || "")
-      ? "/dashboard"
-      : "/student/dashboard";
+    const redirectTo = "/student/dashboard";
     return NextResponse.redirect(new URL(redirectTo, nextUrl));
   }
 
@@ -27,15 +31,8 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  const isStudentRoute = nextUrl.pathname.startsWith("/student");
-  const isTeacherRoute = nextUrl.pathname.startsWith("/teacher") || nextUrl.pathname.startsWith("/dashboard");
-
-  if (isTeacherRoute && !["teacher", "admin", "super_admin"].includes(userRole || "")) {
-    return NextResponse.redirect(new URL("/student/dashboard", nextUrl));
-  }
-
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)"],
