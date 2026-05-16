@@ -6,6 +6,8 @@ import { logger } from "@/lib/logger";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { randomUUID } from "crypto";
 
+export const runtime = "nodejs";
+
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(6),

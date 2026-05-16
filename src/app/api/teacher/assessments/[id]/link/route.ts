@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { randomUUID } from "crypto";
 
+export const runtime = "nodejs";
+
 function generateToken() {
   return randomUUID().replace(/-/g, "");
 }

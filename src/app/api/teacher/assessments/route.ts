@@ -4,6 +4,8 @@ import { query } from "@/lib/db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
+export const runtime = "nodejs";
+
 const createSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().optional(),

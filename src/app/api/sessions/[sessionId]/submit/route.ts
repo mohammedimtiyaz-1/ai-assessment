@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { randomUUID } from "crypto";
 
+export const runtime = "nodejs";
+
 export const POST = auth(async (req) => {
   const parts = req.nextUrl.pathname.split("/");
   const sessionId = parts[parts.length - 2];

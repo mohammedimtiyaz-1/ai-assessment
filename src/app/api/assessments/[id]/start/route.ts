@@ -4,6 +4,8 @@ import { query } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
+export const runtime = "nodejs";
+
 export const POST = auth(async (req) => {
   const parts = req.nextUrl.pathname.split("/");
   const id = parts[parts.length - 2];
