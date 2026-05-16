@@ -55,7 +55,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex h-16 items-center border-b px-6">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg">
+          <Link
+            href={isTeacher ? "/dashboard" : "/student/dashboard"}
+            className="flex items-center gap-2 font-bold text-lg"
+          >
             <GraduationCap className="h-6 w-6 text-primary" />
             <span>AI Assessment</span>
           </Link>
