@@ -22,17 +22,17 @@ export default function HomePage() {
         </div>
         <nav className="flex items-center gap-4">
           {session ? (
-            <Link href={isTeacher ? "/dashboard" : "/student/dashboard"}>
-              <Button>Dashboard</Button>
-            </Link>
+            <Button asChild>
+              <Link href={isTeacher ? "/dashboard" : "/student/dashboard"}>Dashboard</Link>
+            </Button>
           ) : (
             <>
-              <Link href="/login">
-                <Button variant="ghost">Sign in</Button>
-              </Link>
-              <Link href="/signup">
-                <Button>Get Started</Button>
-              </Link>
+              <Button asChild variant="ghost">
+                <Link href="/login">Sign in</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/signup">Get Started</Link>
+              </Button>
             </>
           )}
         </nav>
@@ -68,29 +68,25 @@ export default function HomePage() {
             >
               {session ? (
                 <>
-                  <Link href={isTeacher ? "/dashboard" : "/student/dashboard"}>
-                    <Button size="lg">
+                  <Button asChild size="lg">
+                    <Link href={isTeacher ? "/dashboard" : "/student/dashboard"}>
                       Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                  {isStudent && (
-                    <Link href="/student/upload">
-                      <Button size="lg" variant="outline">
-                        Upload Content
-                      </Button>
                     </Link>
+                  </Button>
+                  {isStudent && (
+                    <Button asChild size="lg" variant="outline">
+                      <Link href="/student/upload">Upload Content</Link>
+                    </Button>
                   )}
                 </>
               ) : (
                 <>
-                  <Link href="/signup">
-                    <Button size="lg">Get Started</Button>
-                  </Link>
-                  <Link href="/login">
-                    <Button size="lg" variant="outline">
-                      Sign In
-                    </Button>
-                  </Link>
+                  <Button asChild size="lg">
+                    <Link href="/signup">Get Started</Link>
+                  </Button>
+                  <Button asChild size="lg" variant="outline">
+                    <Link href="/login">Sign In</Link>
+                  </Button>
                 </>
               )}
             </motion.div>

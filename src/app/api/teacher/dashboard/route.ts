@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-auth";
 import { query } from "@/lib/db";
 
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const userId = req.auth.user.id;
-  const role = req.auth.user.role;
+export const GET = withAuth(async (req: NextRequest, user) => {
+  const userId = user.id;
+  const role = user.role;
   if (!["teacher", "admin", "super_admin"].includes(role || "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

@@ -1,25 +1,26 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/api-auth";
 import { query } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 
-export const POST = auth(async (req) => {
+export const POST = async (req: NextRequest) => {
+  const token = await getSession(req);
   const parts = req.nextUrl.pathname.split("/");
   const id = parts[parts.length - 2];
   if (!id) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
   const body = await req.json().catch(() => ({}));
-  const { token, name, accessCode } = body;
+  const { token: linkToken, name, accessCode } = body;
 
   const linkRes = await query(
     `SELECT l.*, a.config_json, a.status as assessment_status
      FROM assessment_links l
      JOIN assessments a ON l.assessment_id = a.id
      WHERE l.token = $1 AND l.assessment_id = $2`,
-    [token, id]
+    [linkToken, id]
   );
   if (linkRes.rows.length === 0) {
     return NextResponse.json({ error: "Invalid token" }, { status: 404 });
@@ -33,11 +34,11 @@ export const POST = auth(async (req) => {
 
   const config = link.config_json || {};
 
-  if (link.require_login && !req.auth?.user) {
+  if (link.require_login && !token?.sub) {
     return NextResponse.json({ error: "Login required" }, { status: 401 });
   }
 
-  if (!link.require_login && !req.auth?.user && (!name || name.trim().length === 0)) {
+  if (!link.require_login && !token?.sub && (!name || name.trim().length === 0)) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
@@ -57,10 +58,10 @@ export const POST = auth(async (req) => {
     return NextResponse.json({ error: "Assessment closed" }, { status: 403 });
   }
 
-  if (config.allowedAttempts && req.auth?.user?.id) {
+  if (config.allowedAttempts && token?.sub) {
     const attemptRes = await query(
       "SELECT COUNT(*) as count FROM quiz_sessions WHERE user_id = $1 AND assessment_id = $2 AND status = 'completed'",
-      [req.auth.user.id, id]
+      [token.sub, id]
     );
     if (parseInt(attemptRes.rows[0].count, 10) >= config.allowedAttempts) {
       return NextResponse.json({ error: "Attempts exhausted" }, { status: 403 });
@@ -80,8 +81,8 @@ export const POST = auth(async (req) => {
   await query(
     `INSERT INTO quiz_sessions (id, user_id, guest_name, assessment_id, constraints_json, question_ids, status)
      VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
-    [sessionId, req.auth?.user?.id || null, name || null, id, JSON.stringify(config), questionIds]
+    [sessionId, token?.sub || null, name || null, id, JSON.stringify(config), questionIds]
   );
 
   return NextResponse.json({ sessionId });
-});
+};

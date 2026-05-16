@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/api-auth";
 import { query } from "@/lib/db";
 import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 
-export const POST = auth(async (req) => {
+export const POST = async (req: NextRequest) => {
+  const token = await getSession(req);
   const parts = req.nextUrl.pathname.split("/");
   const sessionId = parts[parts.length - 2];
   const body = await req.json().catch(() => ({}));
@@ -22,7 +23,7 @@ export const POST = auth(async (req) => {
 
   const session = sessionRes.rows[0];
 
-  if (req.auth?.user?.id && session.user_id && session.user_id !== req.auth.user.id) {
+  if (token?.sub && session.user_id && session.user_id !== token.sub) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -58,4 +59,4 @@ export const POST = auth(async (req) => {
   );
 
   return NextResponse.json({ success: true, score });
-});
+};

@@ -25,7 +25,8 @@ function LoginForm() {
       const target = ["teacher", "admin", "super_admin"].includes(session.user.role)
         ? "/dashboard"
         : "/student/dashboard";
-      router.push(callbackUrl.startsWith("/") ? callbackUrl : target);
+      const redirectTo = callbackUrl && callbackUrl !== "/" ? callbackUrl : target;
+      router.push(redirectTo);
     }
   }, [status, session, router, callbackUrl]);
 

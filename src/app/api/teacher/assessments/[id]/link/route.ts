@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-auth";
 import { query } from "@/lib/db";
 import { randomUUID } from "crypto";
 
@@ -9,9 +9,8 @@ function generateToken() {
   return randomUUID().replace(/-/g, "");
 }
 
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const role = req.auth.user.role;
+export const GET = withAuth(async (req: NextRequest, user) => {
+  const role = user.role;
   if (!["teacher", "admin", "super_admin"].includes(role || "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -26,9 +25,8 @@ export const GET = auth(async (req) => {
   return NextResponse.json({ links: result.rows });
 });
 
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const role = req.auth.user.role;
+export const POST = withAuth(async (req: NextRequest, user) => {
+  const role = user.role;
   if (!["teacher", "admin", "super_admin"].includes(role || "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -38,7 +36,7 @@ export const POST = auth(async (req) => {
 
   const ownership = await query(
     "SELECT id FROM assessments WHERE id = $1 AND owner_user_id = $2",
-    [id, req.auth.user.id]
+    [id, user.id]
   );
   if (ownership.rows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

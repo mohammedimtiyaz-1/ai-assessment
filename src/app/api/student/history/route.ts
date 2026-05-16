@@ -1,10 +1,9 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-auth";
 import { query } from "@/lib/db";
 
-export const GET = auth(async (req) => {
-  if (!req.auth?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const userId = req.auth.user.id;
+export const GET = withAuth(async (req: NextRequest, user) => {
+  const userId = user.id;
 
   const result = await query(
     `SELECT s.id, COALESCE(a.title, 'Practice') as assessment_title, s.score, s.finished_at, s.status

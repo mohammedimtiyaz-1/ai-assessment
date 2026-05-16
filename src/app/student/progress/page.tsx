@@ -108,6 +108,29 @@ export default function ProgressPage() {
               </CardContent>
             </Card>
           )}
+
+          {data!.recentTrend.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Recent Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {data!.recentTrend.map((trend, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {new Date(trend.date).toLocaleDateString()}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Progress value={trend.score} className="w-24 h-2" />
+                        <span className="font-medium w-10 text-right">{trend.score}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

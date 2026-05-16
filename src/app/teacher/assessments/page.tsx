@@ -18,7 +18,6 @@ interface Assessment {
 export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     fetch("/api/teacher/assessments")
@@ -29,25 +28,6 @@ export default function AssessmentsPage() {
       })
       .catch(() => setLoading(false));
   }, []);
-
-  async function createAssessment() {
-    const title = window.prompt("Assessment title:");
-    if (!title) return;
-    setCreating(true);
-    try {
-      const res = await fetch("/api/teacher/assessments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setAssessments((prev) => [{ id: data.id, title: data.title, status: data.status, created_at: new Date().toISOString() }, ...prev]);
-      }
-    } finally {
-      setCreating(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -64,10 +44,12 @@ export default function AssessmentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Assessments</h1>
-        <Button onClick={createAssessment} disabled={creating}>
-          <Plus className="mr-2 h-4 w-4" />
-          {creating ? "Creating..." : "Create"}
-        </Button>
+        <Link href="/teacher/assessments/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create
+          </Button>
+        </Link>
       </div>
 
       {assessments.length === 0 && (
@@ -76,9 +58,12 @@ export default function AssessmentsPage() {
             <FileQuestion className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold">No assessments yet</h3>
             <p className="text-sm text-muted-foreground mt-2">Create your first assessment to share with students.</p>
-            <Button className="mt-4" onClick={createAssessment} disabled={creating}>
-              {creating ? "Creating..." : "Create assessment"}
-            </Button>
+            <Link href="/teacher/assessments/create">
+              <Button className="mt-4">
+                <Plus className="mr-2 h-4 w-4" />
+                Create assessment
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}

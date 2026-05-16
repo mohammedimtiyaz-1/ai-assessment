@@ -1,13 +1,12 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-auth";
 import { query } from "@/lib/db";
 import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 
-export const POST = auth(async (req) => {
-  if (!req.auth?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const userId = req.auth.user.id;
+export const POST = withAuth(async (req: NextRequest, user) => {
+  const userId = user.id;
 
   const body = await req.json().catch(() => ({}));
   const contentId = body.contentId;
