@@ -5,13 +5,12 @@ import { env } from "./env";
 export async function getSession(req: NextRequest) {
   const isSecure = process.env.NODE_ENV === "production";
   const cookieName = isSecure
-    ? "__Secure-authjs.session-token"
-    : "authjs.session-token";
+    ? "__Secure-next-auth.session-token"
+    : "next-auth.session-token";
 
   const rawToken = await getToken({
     req: req as any,
     secret: env.NEXTAUTH_SECRET,
-    salt: cookieName,
     cookieName,
     secureCookie: isSecure,
     raw: true,
@@ -22,7 +21,6 @@ export async function getSession(req: NextRequest) {
   const decoded = await decode({
     token: rawToken,
     secret: env.NEXTAUTH_SECRET,
-    salt: cookieName,
   });
 
   return decoded;

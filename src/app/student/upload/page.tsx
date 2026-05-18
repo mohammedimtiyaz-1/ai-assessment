@@ -21,6 +21,9 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const onDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -60,16 +63,31 @@ export default function UploadPage() {
 
     try {
       setProgress(60);
+      setGenerating(true);
       const res = await fetch("/api/student/content", { method: "POST", body: formData });
-      setProgress(100);
+      const data = await res.json();
+      
       if (res.ok) {
+        setProgress(100);
+        
+        if (data.warning) {
+          setWarning(data.warning);
+          setGenerating(false);
+          setUploading(false);
+          return;
+        }
+        
         setDone(true);
-        setTimeout(() => router.push("/student/content"), 1000);
+        setTimeout(() => router.push("/student/quiz"), 1000);
       } else {
+        setError(data.error || "Failed to upload content");
         setUploading(false);
+        setGenerating(false);
       }
     } catch {
+      setError("Failed to upload content. Please try again.");
       setUploading(false);
+      setGenerating(false);
     }
   }
 
@@ -158,14 +176,16 @@ export default function UploadPage() {
             {uploading && !done && (
               <div className="space-y-2">
                 <Progress value={progress} />
-                <p className="text-xs text-muted-foreground">Uploading...</p>
+                <p className="text-xs text-muted-foreground">
+                  {generating ? "Generating quiz questions..." : "Uploading..."}
+                </p>
               </div>
             )}
 
             {done && (
-              <div className="flex items-center gap-2 text-sm text-green-600">
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                 <CheckCircle className="h-4 w-4" />
-                Upload complete! Redirecting...
+                Quiz generated successfully! Redirecting...
               </div>
             )}
 

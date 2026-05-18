@@ -30,6 +30,8 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  logger.info({ userId: user.id, userEmail: user.email, userRole: user.role }, "Fetching teacher assessments");
+
   const result = await query(
     "SELECT id, title, description, status, created_at FROM assessments WHERE owner_user_id = $1 ORDER BY created_at DESC",
     [user.id]
@@ -80,17 +82,23 @@ export const POST = withAuth(async (req: NextRequest, user) => {
 
     await query(
       "INSERT INTO assessments (id, owner_user_id, title, description, ai_note, config_json, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [id, user.id, title, description || null, aiNote || null, JSON.stringify(finalConfig), "draft"]
+      [id, user.id, title, description || null, aiNote || null, JSON.stringify(finalConfig), "created"]
     );
 
-    return NextResponse.json({ id, title, status: "draft" }, { status: 201 });
+    return NextResponse.json({ id, title, status: "created" }, { status: 201 });
   } catch (error: any) {
     console.error("Error creating assessment:", error);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+    });
     
     if (error.code === '23503') {
       return NextResponse.json({ error: "User not found. Please log out and log in again." }, { status: 400 });
     }
     
-    return NextResponse.json({ error: "Failed to create assessment" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create assessment", details: error.message }, { status: 500 });
   }
 });

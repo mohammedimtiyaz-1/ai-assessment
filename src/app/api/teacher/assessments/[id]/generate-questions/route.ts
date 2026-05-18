@@ -41,23 +41,22 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   let totalQuestionsGenerated = 0;
   for (const content of linkedContentRes.rows) {
     try {
-      let contentText = "";
+      // Use storage_ref for content text - this contains the actual text content
+      // For text content, it's the text itself; for files, it's the extracted text
+      let contentText = content.storage_ref || "";
       
-      // Extract content text based on type
-      if (content.type === "text") {
-        contentText = content.storage_ref || "";
-      } else {
-        // For file types, storage_ref might be a path - for now, we'll use the title as fallback
-        // In a real implementation, you'd read the file from storage
+      // Fallback to title if no storage_ref
+      if (!contentText.trim()) {
         contentText = content.title;
       }
 
       if (!contentText.trim()) {
+        console.log(`Skipping content ${content.id}: no text available`);
         continue;
       }
 
       // Generate questions using AI
-      const questions = await generateQuestions(contentText, 5); // 5 questions per content
+      const questions = await generateQuestions(contentText, { count: 5 }); // 5 questions per content
       
       // Store questions and link to assessment
       for (const q of questions) {

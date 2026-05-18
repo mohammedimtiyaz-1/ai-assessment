@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Menu,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -47,20 +48,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const links = isTeacher ? teacherLinks : studentLinks;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen relative overflow-hidden">
+      {/* Colorful Gradient Background Decor */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/20 blur-[120px] -z-10" />
+      <div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-fuchsia-600/20 blur-[140px] -z-10" />
+      <div className="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] rounded-full bg-cyan-600/20 blur-[120px] -z-10" />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-background/95 backdrop-blur transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static",
+          "fixed inset-y-0 left-0 z-50 w-64 transform border-r border-white/10 bg-slate-950/95 backdrop-blur transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center border-b px-6">
+        <div className="flex h-16 items-center border-b px-6 border-white/10">
           <Link
             href={isTeacher ? "/dashboard" : "/student/dashboard"}
-            className="flex items-center gap-2 font-bold text-lg"
+            className="flex items-center gap-2 font-bold text-lg text-indigo-400"
           >
-            <GraduationCap className="h-6 w-6 text-primary" />
-            <span>AI Assessment</span>
+            <Sparkles className="h-6 w-6" />
+            <span className="text-white">AI Tutor</span>
           </Link>
           <Button variant="ghost" size="icon" className="ml-auto lg:hidden" onClick={() => setMobileOpen(false)}>
             <X className="h-5 w-5" />
@@ -77,8 +82,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   active
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -86,14 +91,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          <div className="my-4 border-t" />
+          <div className="my-4 border-t border-white/10" />
           <Link
             href="/profile"
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               pathname === "/profile"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
             )}
           >
             <User className="h-4 w-4" />
@@ -104,8 +109,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               pathname === "/settings"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
             )}
           >
             <Settings className="h-4 w-4" />
@@ -113,7 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
           >
             <LogOut className="h-4 w-4" />
             Sign out

@@ -27,6 +27,15 @@ export const POST = async (req: NextRequest) => {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Check if assessment is closed
+  const assessmentRes = await query(
+    "SELECT status FROM assessments WHERE id = $1",
+    [session.assessment_id]
+  );
+  if (assessmentRes.rows.length > 0 && assessmentRes.rows[0].status === "closed") {
+    return NextResponse.json({ error: "Assessment is closed and no longer accepting submissions" }, { status: 403 });
+  }
+
   const now = new Date();
   if (session.constraints_json?.timeLimitSec) {
     const elapsed = (now.getTime() - new Date(session.started_at).getTime()) / 1000;

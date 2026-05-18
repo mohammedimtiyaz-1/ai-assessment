@@ -57,25 +57,13 @@ export const POST = withAuth(async (req: NextRequest, user) => {
 
     logger.info({ contentId, userId: user.id, title }, "Content created successfully");
 
-    // Generate questions from the content
-    try {
-      const questions = await generateQuestions(textContent || "", 5);
-      
-      for (const q of questions) {
-        const questionId = randomUUID();
-        
-        await query(
-          `INSERT INTO questions (id, source_content_id, body, answers_json, correct_answer_key, difficulty)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [questionId, contentId, q.body, JSON.stringify(q.answers), q.correctAnswer, q.difficulty || "medium"]
-        );
-      }
-      logger.info({ contentId, questionCount: questions.length }, "Questions generated for content");
-    } catch (error) {
-      logger.error({ contentId, userId: user.id, error }, "Failed to generate questions for content");
-    }
+    // Removed automatic question generation - questions will be generated on-demand via the quiz generation API
 
-    return NextResponse.json({ id: contentId, title, type: uploadType });
+    return NextResponse.json({
+      id: contentId,
+      title,
+      type: uploadType,
+    });
   } catch (error) {
     logger.error({ userId: user.id, error }, "Error creating content");
     return NextResponse.json({ error: "Failed to create content" }, { status: 500 });

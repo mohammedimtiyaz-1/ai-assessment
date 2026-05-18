@@ -12,8 +12,7 @@ export async function GET(req: NextRequest) {
   const rawToken = await getToken({
     req: req as any,
     secret: env.NEXTAUTH_SECRET,
-    salt: "authjs.session-token",
-    cookieName: "authjs.session-token",
+    cookieName: "next-auth.session-token",
     secureCookie: false,
     raw: true,
   });
@@ -25,7 +24,6 @@ export async function GET(req: NextRequest) {
       decodedToken = await decode({
         token: rawToken,
         secret: env.NEXTAUTH_SECRET,
-        salt: "authjs.session-token",
       });
     }
   } catch (e: any) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,9 @@ export default function SettingsPage() {
         body: JSON.stringify({ role: "teacher" }),
       });
       if (res.ok) {
+        // Sign out to clear the session with old role
+        await signOut({ redirect: false });
+        // Redirect to login to sign in with new role
         router.push("/login?callbackUrl=/dashboard");
       }
     } finally {

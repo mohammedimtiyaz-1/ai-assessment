@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   }
 
   const linkRes = await query(
-    `SELECT l.*, a.id as assessment_id, a.title, a.description, a.config_json
+    `SELECT l.*, a.id as assessment_id, a.title, a.description, a.config_json, a.status
      FROM assessment_links l
      JOIN assessments a ON l.assessment_id = a.id
      WHERE l.token = $1`,
@@ -33,5 +33,6 @@ export async function GET(req: Request) {
     config: link.config_json || {},
     requireLogin: link.require_login,
     hasAccessCode: !!link.access_code_hash,
+    status: link.status,
   });
 }

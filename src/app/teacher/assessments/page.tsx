@@ -70,19 +70,28 @@ export default function AssessmentsPage() {
 
       <div className="space-y-3">
         {assessments.map((a) => (
-          <Card key={a.id}>
+          <Card 
+            key={a.id} 
+            className="cursor-pointer hover:bg-accent/50 transition-colors hover:shadow-md"
+            onClick={() => window.location.href = `/teacher/assessments/${a.id}`}
+          >
             <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="font-medium">{a.title}</p>
+              <div className="flex-1">
+                <p className="font-medium hover:text-primary transition-colors">{a.title}</p>
                 <p className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleDateString()}</p>
               </div>
               <div className="flex items-center gap-3">
-                <Badge variant={a.status === "published" ? "default" : "secondary"}>{a.status}</Badge>
-                <Link href={`/teacher/assessments/${a.id}`}>
-                  <Button variant="ghost" size="sm">
-                    Open <ArrowRight className="ml-2 h-3 w-3" />
-                  </Button>
-                </Link>
+                <Badge 
+                  className={
+                    a.status === "created" ? "bg-blue-500 hover:bg-blue-600" :
+                    a.status === "started" || a.status === "in_progress" ? "bg-green-500 hover:bg-green-600" :
+                    a.status === "closed" ? "bg-red-500 hover:bg-red-600" :
+                    "bg-gray-500 hover:bg-gray-600"
+                  }
+                >
+                  {a.status === "created" ? "Created" : a.status === "started" || a.status === "in_progress" ? "In Progress" : a.status === "closed" ? "Closed" : a.status}
+                </Badge>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>

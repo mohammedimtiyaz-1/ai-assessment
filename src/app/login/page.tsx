@@ -1,113 +1,78 @@
 "use client";
-
-import { useState, Suspense, useEffect } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { useState } from "react";
 
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
-  const { data: session, status } = useSession();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (status === "authenticated" && session?.user?.role) {
-      const target = ["teacher", "admin", "super_admin"].includes(session.user.role)
-        ? "/dashboard"
-        : "/student/dashboard";
-      const redirectTo = callbackUrl && callbackUrl !== "/" ? callbackUrl : target;
-      router.push(redirectTo);
-    }
-  }, [status, session, router, callbackUrl]);
-
-  async function onSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
     setLoading(true);
-    const res = await signIn("credentials", {
-      redirect: false,
+    setError("");
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    const result = await signIn("credentials", {
       email,
       password,
+      redirect: false,
+      callbackUrl: searchParams.get("callbackUrl") || "/dashboard",
     });
-    setLoading(false);
-    if (res?.error) {
-      setError("Invalid email or password");
-      return;
+
+    if (result?.error) {
+      setError("Invalid credentials");
+      setLoading(false);
+    } else if (result?.ok) {
+      router.push(searchParams.get("callbackUrl") || "/dashboard");
     }
-    router.refresh();
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center gap-2 font-bold text-2xl">
-          <GraduationCap className="h-8 w-8 text-primary" />
           <span>AI Assessment</span>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Sign in</CardTitle>
-            <CardDescription>Enter your credentials to continue</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Sign in
-              </Button>
-            </form>
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <Link href="/forgot-password" className="text-primary hover:underline">
-                Forgot password?
-              </Link>
-              <Link href="/signup" className="text-primary hover:underline">
-                Create account
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center justify-center gap-2 font-bold text-2xl">
-            <GraduationCap className="h-8 w-8 text-primary" />
-            <span>AI Assessment</span>
+        <div className="rounded-lg border bg-slate-900 p-6">
+          <div className="mb-4">
+            <h3 className="text-xl font-semibold">Sign in</h3>
+            <p className="text-sm text-slate-400">Enter your credentials to continue</p>
           </div>
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-            </CardContent>
-          </Card>
+          {error && (
+            <div className="mb-4 rounded-md bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <input id="email" name="email" type="email" required className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">Password</label>
+              <input id="password" name="password" type="password" required className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm" />
+            </div>
+            <button type="submit" disabled={loading} className="w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
+              {loading ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <Link href="/forgot-password" className="text-purple-400 hover:underline">
+              Forgot password?
+            </Link>
+            <Link href="/signup" className="text-purple-400 hover:underline">
+              Create account
+            </Link>
+          </div>
         </div>
       </div>
-    }>
-      <LoginForm />
-    </Suspense>
+    </div>
   );
 }

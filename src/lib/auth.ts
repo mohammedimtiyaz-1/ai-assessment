@@ -18,12 +18,7 @@ const credentialsSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const {
-  handlers: { GET, POST },
-  auth,
-  signIn,
-  signOut,
-} = NextAuth({
+export const authOptions = {
   providers: [
     Credentials({
       name: "credentials",
@@ -55,12 +50,12 @@ export const {
     }),
   ],
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as const,
     maxAge: 30 * 24 * 60 * 60, // 30 days
     updateAge: 24 * 60 * 60, // Update session every 24 hours
   },
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }: any) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -73,8 +68,8 @@ export const {
       
       return token;
     },
-    async session({ session, token }) {
-      if (token && session.user) {
+    async session({ session, token }: any) {
+      if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
       }
@@ -85,6 +80,7 @@ export const {
     signIn: "/login",
     error: "/login",
   },
-  trustHost: true,
   secret: env.NEXTAUTH_SECRET,
-});
+};
+
+export default NextAuth(authOptions);

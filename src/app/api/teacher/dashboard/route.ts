@@ -5,14 +5,17 @@ import { query } from "@/lib/db";
 export const GET = withAuth(async (req: NextRequest, user) => {
   const userId = user.id;
   const role = user.role;
+  console.log("Dashboard API called:", { userId, userEmail: user.email, role });
+  
   if (!["teacher", "admin", "super_admin"].includes(role || "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const assessmentsRes = await query(
-    "SELECT id, title, status, created_at FROM assessments WHERE owner_user_id = $1 ORDER BY created_at DESC LIMIT 10",
+    "SELECT id, title, status, created_at, owner_user_id FROM assessments WHERE owner_user_id = $1 ORDER BY created_at DESC LIMIT 10",
     [userId]
   );
+  console.log("Dashboard assessments query:", { userId, count: assessmentsRes.rows.length });
 
   const countRes = await query(
     "SELECT COUNT(*) as count FROM assessments WHERE owner_user_id = $1",

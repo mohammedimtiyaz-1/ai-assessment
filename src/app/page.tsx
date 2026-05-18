@@ -1,122 +1,96 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { GraduationCap, Brain, Zap, ArrowRight } from "lucide-react";
+import { GlassCard } from "@/components/ui/glass-card";
+import { GraduationCap, Brain, Zap, ArrowRight, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function HomePage() {
-  const { data: session } = useSession();
-  const role = session?.user?.role;
-  const isStudent = role === "student";
-  const isTeacher = ["teacher", "admin", "super_admin"].includes(role || "");
-
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex h-16 items-center justify-between px-6 border-b">
-        <div className="flex items-center gap-2 font-bold text-lg">
-          <GraduationCap className="h-6 w-6 text-primary" />
-          <span>AI Assessment</span>
+    <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-purple-500/30 overflow-hidden relative font-sans">
+      {/* Colorful Gradient Background Decor */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/20 blur-[120px]" />
+      <div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-fuchsia-600/20 blur-[140px]" />
+      <div className="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] rounded-full bg-cyan-600/20 blur-[120px]" />
+
+      <header className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-2 text-indigo-400">
+          <Sparkles className="h-8 w-8" />
+          <span className="text-2xl font-bold tracking-tight text-white">AI Tutor</span>
         </div>
         <nav className="flex items-center gap-4">
-          {session ? (
-            <Button asChild>
-              <Link href={isTeacher ? "/dashboard" : "/student/dashboard"}>Dashboard</Link>
-            </Button>
-          ) : (
-            <>
-              <Button asChild variant="ghost">
-                <Link href="/login">Sign in</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/signup">Get Started</Link>
-              </Button>
-            </>
-          )}
+          <Button asChild variant="ghost">
+            <Link href="/login">Log in</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/signup">Get Started</Link>
+          </Button>
         </nav>
       </header>
 
-      <main className="flex-1">
-        <section className="relative overflow-hidden px-6 py-24 lg:py-32">
-          <div className="mx-auto max-w-5xl text-center">
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-4xl font-bold tracking-tight sm:text-6xl"
-            >
-              Learn Smarter with{" "}
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                AI-Powered
-              </span>{" "}
-              Assessments
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground"
-            >
-              Upload your study materials, generate practice questions, and track your progress with intelligent quizzes tailored to your content.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mt-10 flex flex-wrap items-center justify-center gap-4"
-            >
-              {session ? (
-                <>
-                  <Button asChild size="lg">
-                    <Link href={isTeacher ? "/dashboard" : "/student/dashboard"}>
-                      Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                  {isStudent && (
-                    <Button asChild size="lg" variant="outline">
-                      <Link href="/student/upload">Upload Content</Link>
-                    </Button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Button asChild size="lg">
-                    <Link href="/signup">Get Started</Link>
-                  </Button>
-                  <Button asChild size="lg" variant="outline">
-                    <Link href="/login">Sign In</Link>
-                  </Button>
-                </>
-              )}
-            </motion.div>
-          </div>
-        </section>
+      <main className="relative z-10 max-w-7xl mx-auto px-8 pt-20 pb-32">
+        <div className="text-center max-w-3xl mx-auto space-y-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <span className="inline-block py-1.5 px-4 rounded-full bg-white/5 border border-white/10 text-indigo-300 text-sm font-semibold mb-6 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+              The Future of Learning is Here
+            </span>
+            <h1 className="text-6xl font-extrabold tracking-tight text-white leading-tight">
+              Master any topic with <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-fuchsia-400">
+                AI-Powered Learning
+              </span>
+            </h1>
+            <p className="mt-6 text-xl text-slate-400 leading-relaxed">
+              Upload your materials, generate personalized practice exams, and get intelligent feedback to learn faster and retain more.
+            </p>
+          </motion.div>
 
-        <section className="px-6 py-16">
-          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
-            {[
-              { icon: Brain, title: "AI Question Generation", desc: "Turn any material into practice questions automatically." },
-              { icon: Zap, title: "Adaptive Quizzes", desc: "Sessions adapt to your knowledge gaps and learning pace." },
-              { icon: GraduationCap, title: "Progress Tracking", desc: "Visual insights into your strengths and weak areas." },
-            ].map((f, i) => (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + i * 0.1 }}
-              >
-                <Card className="h-full">
-                  <CardContent className="p-6">
-                    <f.icon className="h-8 w-8 text-primary mb-4" />
-                    <h3 className="text-lg font-semibold">{f.title}</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">{f.desc}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </section>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex items-center justify-center gap-4 pt-4"
+          >
+            <Button size="lg" asChild className="gap-2">
+              <Link href="/student">
+                I'm a Student <ArrowRight className="w-5 h-5" />
+              </Link>
+            </Button>
+            <Button size="lg" variant="secondary" asChild className="gap-2">
+              <Link href="/teacher">
+                I'm a Teacher <ArrowRight className="w-5 h-5" />
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+
+        <div className="mt-32 grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            { icon: Brain, title: "Smart Generation", desc: "Instantly create quizzes from PDFs, slides, and notes.", color: "text-fuchsia-400", bg: "bg-fuchsia-500/10 border-fuchsia-500/20" },
+            { icon: Zap, title: "Instant Feedback", desc: "Get detailed explanations for every right and wrong answer.", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+            { icon: GraduationCap, title: "Track Progress", desc: "Visualize your strengths and focus on weak points.", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+          ].map((feature, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 + i * 0.1 }}
+            >
+              <GlassCard className="p-8 h-full">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 border ${feature.bg}`}>
+                  <feature.icon className={`w-7 h-7 ${feature.color}`} />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
+                <p className="text-slate-400 leading-relaxed">{feature.desc}</p>
+              </GlassCard>
+            </motion.div>
+          ))}
+        </div>
       </main>
     </div>
   );

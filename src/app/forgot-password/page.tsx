@@ -36,13 +36,15 @@ export default function ForgotPasswordPage() {
           </CardHeader>
           <CardContent>
             {sent ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <p className="text-sm text-muted-foreground">
                   If an account exists for <strong>{email}</strong>, you will receive a password reset email shortly.
                 </p>
-                <Link href="/login">
-                  <Button className="w-full">Back to login</Button>
-                </Link>
+                <div className="flex justify-center">
+                  <Link href="/login">
+                    <Button variant="outline">Back to login</Button>
+                  </Link>
+                </div>
               </div>
             ) : (
               <form onSubmit={onSubmit} className="space-y-4">
