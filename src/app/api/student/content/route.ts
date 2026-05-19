@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { generateQuestions } from "@/lib/ai";
 import { logger } from "@/lib/logger";
+import { processUploadedFile } from "@/lib/content-extraction";
 
 export const runtime = "nodejs";
 
@@ -49,13 +50,59 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     if (!title) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
+
     const contentId = randomUUID();
+    
+    // Initialize content extraction fields
+    let fileType = uploadType;
+    let originalFileName = null;
+    let fileSize = null;
+    let extractedContent = textContent;
+    let extractionStatus = 'completed';
+    let extractionError = null;
+    let mimeType = uploadType === 'text' ? 'text/plain' : null;
+
+    // Process file uploads with content extraction
+    if (uploadType === 'file' && file) {
+      originalFileName = file.name;
+      fileSize = file.size;
+      mimeType = file.type;
+
+      try {
+        logger.info({ fileName: file.name, mimeType: file.type }, 'Starting file processing');
+        
+        const extractionResult = await processUploadedFile(file, {
+          original_file_name: file.name,
+          file_size: file.size,
+          mime_type: file.type
+        });
+
+        fileType = extractionResult.file_type;
+        extractedContent = extractionResult.extracted_content;
+        extractionStatus = extractionResult.extraction_status;
+        extractionError = extractionResult.extraction_error;
+        mimeType = extractionResult.mime_type;
+
+        logger.info({ 
+          contentId, 
+          fileType, 
+          extractionStatus, 
+          contentLength: extractedContent?.length 
+        }, 'File processing completed');
+      } catch (error) {
+        logger.error({ error, fileName: file.name }, 'File processing failed');
+        extractionStatus = 'failed';
+        extractionError = error instanceof Error ? error.message : 'Unknown error';
+      }
+    }
+
     await query(
-      "INSERT INTO content (id, owner_user_id, title, type, storage_ref) VALUES ($1, $2, $3, $4, $5)",
-      [contentId, user.id, title, uploadType, textContent]
+      `INSERT INTO content (id, owner_user_id, title, type, storage_ref, file_type, original_file_name, file_size, extracted_content, extraction_status, extraction_error, mime_type) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [contentId, user.id, title, uploadType, textContent, fileType, originalFileName, fileSize, extractedContent, extractionStatus, extractionError, mimeType]
     );
 
-    logger.info({ contentId, userId: user.id, title }, "Content created successfully");
+    logger.info({ contentId, userId: user.id, title, fileType, extractionStatus }, "Content created successfully");
 
     // Removed automatic question generation - questions will be generated on-demand via the quiz generation API
 
@@ -63,6 +110,8 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       id: contentId,
       title,
       type: uploadType,
+      fileType,
+      extractionStatus,
     });
   } catch (error) {
     logger.error({ userId: user.id, error }, "Error creating content");

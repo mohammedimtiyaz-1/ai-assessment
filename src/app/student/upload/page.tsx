@@ -78,7 +78,7 @@ export default function UploadPage() {
         }
         
         setDone(true);
-        setTimeout(() => router.push("/student/quiz"), 1000);
+        setTimeout(() => router.push("/student/content"), 1000);
       } else {
         setError(data.error || "Failed to upload content");
         setUploading(false);
@@ -185,7 +185,7 @@ export default function UploadPage() {
             {done && (
               <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                 <CheckCircle className="h-4 w-4" />
-                Quiz generated successfully! Redirecting...
+                Content uploaded successfully! Redirecting...
               </div>
             )}
 
