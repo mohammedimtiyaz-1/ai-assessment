@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, BookOpen, Calendar, Sparkles, ArrowRight } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, Sparkles, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface ContentDetail {
@@ -18,6 +18,8 @@ interface ContentDetail {
   type: string;
   storage_ref: string;
   created_at: string;
+  extracted_content: string | null;
+  extraction_status: string;
 }
 
 interface QuizConfig {
@@ -145,76 +147,113 @@ export default function ContentDetailPage({ params }: { params: { id: string } }
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {content.storage_ref && (
-            <p className="text-sm text-muted-foreground">
-              Storage: <code className="text-xs bg-secondary px-1 py-0.5 rounded">{content.storage_ref}</code>
-            </p>
-          )}
-          
-          {quizConfig ? (
-            <Link href={`/student/quiz?quizConfigurationId=${quizConfig.quizConfigurationId}`} className="w-full">
-              <Button className="w-full">
-                <ArrowRight className="mr-2 h-4 w-4" />
-                Go to Quiz
-              </Button>
-            </Link>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Select value={questionType} onValueChange={setQuestionType}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mcq">Multiple Choice</SelectItem>
-                    <SelectItem value="essay">Essay</SelectItem>
-                    <SelectItem value="fill-blanks">Fill in Blanks</SelectItem>
-                    <SelectItem value="match-following">Match Following</SelectItem>
-                    <SelectItem value="riddle">Riddle</SelectItem>
-                    <SelectItem value="mixed">Mixed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={difficulty} onValueChange={setDifficulty}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Difficulty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                    <SelectItem value="mixed">Mixed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={questionCount} onValueChange={setQuestionCount}>
-                  <SelectTrigger className="w-20">
-                    <SelectValue placeholder="#" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3</SelectItem>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="15">15</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={handleGenerateQuiz}
-                disabled={generatingQuiz}
-                className="w-full"
-              >
-                {generatingQuiz ? (
-                  <>Generating...</>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate Quiz
-                  </>
-                )}
-              </Button>
+        <CardContent className="space-y-6">
+          {content.extraction_status === 'failed' && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+              Failed to extract content from this file. You may need to re-upload.
             </div>
           )}
+          
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Material Content</h4>
+            <div className="bg-secondary/30 p-4 rounded-lg max-h-[400px] overflow-y-auto border border-secondary/50 shadow-inner">
+              {content.extracted_content ? (
+                <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                  {content.extracted_content}
+                </div>
+              ) : (
+                <div className="text-sm italic text-muted-foreground">
+                  {content.extraction_status === 'pending' ? 'Content extraction in progress...' : 'No content extracted yet.'}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Generate Practice Quiz</h4>
+            {quizConfig ? (
+              <Link href={`/student/quiz?quizConfigurationId=${quizConfig.quizConfigurationId}`} className="w-full">
+                <Button className="w-full" size="lg">
+                  <ArrowRight className="mr-2 h-5 w-5" />
+                  Start Generated Quiz
+                </Button>
+              </Link>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Type</label>
+                    <Select value={questionType} onValueChange={setQuestionType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mcq">Multiple Choice</SelectItem>
+                        <SelectItem value="essay">Essay</SelectItem>
+                        <SelectItem value="fill-blanks">Fill in Blanks</SelectItem>
+                        <SelectItem value="match-following">Match Following</SelectItem>
+                        <SelectItem value="riddle">Riddle</SelectItem>
+                        <SelectItem value="mixed">Mixed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Difficulty</label>
+                    <Select value={difficulty} onValueChange={setDifficulty}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="hard">Hard</SelectItem>
+                        <SelectItem value="mixed">Mixed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-24 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Count</label>
+                    <Select value={questionCount} onValueChange={setQuestionCount}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="#" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3">3</SelectItem>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="15">15</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleGenerateQuiz}
+                  disabled={generatingQuiz || !content.extracted_content}
+                  className="w-full"
+                  size="lg"
+                  variant="default"
+                >
+                  {generatingQuiz ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Generating with AI...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-5 w-5 text-yellow-400" />
+                      Generate AI Quiz
+                    </>
+                  )}
+                </Button>
+                {!content.extracted_content && (
+                  <p className="text-[10px] text-center text-muted-foreground">
+                    Cannot generate quiz without extracted content.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

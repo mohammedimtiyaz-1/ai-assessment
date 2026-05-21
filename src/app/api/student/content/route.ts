@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { generateQuestions } from "@/lib/ai";
 import { logger } from "@/lib/logger";
@@ -14,30 +14,46 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const id = searchParams.get("id");
 
   if (id) {
-    const result = await query(
-      "SELECT id, title, type, storage_ref, created_at FROM content WHERE id = $1 AND owner_user_id = $2",
-      [id, userId]
-    );
-    return NextResponse.json({ content: result.rows });
+    const { data: content, error } = await supabase
+      .from('content')
+      .select('id, title, type, storage_ref, created_at, extracted_content, extraction_status')
+      .eq('id', id)
+      .eq('owner_user_id', userId)
+      .single();
+    
+    if (error) {
+      logger.error({ error, id }, "Error fetching content");
+      return NextResponse.json({ error: "Failed to fetch content" }, { status: 500 });
+    }
+    
+    return NextResponse.json({ content: [content] });
   }
 
-  const result = await query(
-    "SELECT id, title, type, storage_ref, created_at FROM content WHERE owner_user_id = $1 ORDER BY created_at DESC",
-    [userId]
-  );
-  return NextResponse.json({ content: result.rows });
+  const { data: content, error } = await supabase
+    .from('content')
+    .select('id, title, type, storage_ref, created_at')
+    .eq('owner_user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    logger.error({ error, userId }, "Error fetching content list");
+    return NextResponse.json({ error: "Failed to fetch content" }, { status: 500 });
+  }
+  
+  return NextResponse.json({ content: content || [] });
 });
 
 export const POST = withAuth(async (req: NextRequest, user) => {
   const userId = user.id;
 
   try {
-    const userCheck = await query(
-      "SELECT id FROM users WHERE id = $1",
-      [userId]
-    );
+    const { data: userCheck, error: userCheckError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single();
 
-    if (userCheck.rows.length === 0) {
+    if (userCheckError || !userCheck) {
       return NextResponse.json({ error: "User not found. Please log out and log in again." }, { status: 400 });
     }
 
@@ -96,15 +112,29 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       }
     }
 
-    await query(
-      `INSERT INTO content (id, owner_user_id, title, type, storage_ref, file_type, original_file_name, file_size, extracted_content, extraction_status, extraction_error, mime_type) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [contentId, user.id, title, uploadType, textContent, fileType, originalFileName, fileSize, extractedContent, extractionStatus, extractionError, mimeType]
-    );
+    const { error: insertError } = await supabase
+      .from('content')
+      .insert({
+        id: contentId,
+        owner_user_id: userId,
+        title,
+        type: uploadType,
+        storage_ref: textContent,
+        file_type: fileType,
+        original_file_name: originalFileName,
+        file_size: fileSize,
+        extracted_content: extractedContent,
+        extraction_status: extractionStatus,
+        extraction_error: extractionError,
+        mime_type: mimeType
+      } as any);
+
+    if (insertError) {
+      logger.error({ error: insertError, contentId }, "Error inserting content");
+      return NextResponse.json({ error: "Failed to create content" }, { status: 500 });
+    }
 
     logger.info({ contentId, userId: user.id, title, fileType, extractionStatus }, "Content created successfully");
-
-    // Removed automatic question generation - questions will be generated on-demand via the quiz generation API
 
     return NextResponse.json({
       id: contentId,

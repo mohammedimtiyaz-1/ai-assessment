@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, BookOpen, Calendar, Sparkles, ArrowRight } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface ContentItem {
@@ -28,6 +28,8 @@ interface QuizConfig {
 
 export default function ContentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const newId = searchParams.get("newId");
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingQuiz, setGeneratingQuiz] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export default function ContentPage() {
   const [difficulty, setDifficulty] = useState<Record<string, string>>({});
   const [questionCount, setQuestionCount] = useState<Record<string, string>>({});
   const [questionType, setQuestionType] = useState<Record<string, string>>({});
+  const newItemRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/student/content")
@@ -58,6 +61,18 @@ export default function ContentPage() {
         setLoading(false);
       });
   }, [router]);
+
+  useEffect(() => {
+    if (newId && !loading && items.length > 0) {
+      const newItem = items.find(item => item.id === newId);
+      if (newItem) {
+        toast.success(`"${newItem.title}" uploaded successfully!`);
+        if (newItemRef.current) {
+          newItemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  }, [newId, loading, items]);
 
   const handleGenerateQuiz = async (contentId: string) => {
     setGeneratingQuiz(contentId);
@@ -130,19 +145,35 @@ export default function ContentPage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-        {items.map((item) => (
-          <Card key={item.id} className="flex flex-col min-h-[300px]">
-            <CardContent className="p-6 flex-1 flex flex-col">
-              <div className="flex items-start justify-between">
-                <Link href={`/student/content/${item.id}`} className="flex items-center gap-2 hover:text-primary transition-colors">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold text-base">{item.title}</h3>
-                </Link>
-                <Badge variant="secondary">{item.type}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mt-3">
-                Added {new Date(item.created_at).toLocaleDateString()}
-              </p>
+        {items.map((item) => {
+          const isNew = item.id === newId;
+          return (
+            <Card 
+              key={item.id} 
+              ref={isNew ? newItemRef : null}
+              className={`flex flex-col min-h-[300px] transition-all duration-500 ${
+                isNew ? "border-primary ring-2 ring-primary/20 shadow-lg" : ""
+              }`}
+            >
+              <CardContent className="p-6 flex-1 flex flex-col">
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-col gap-1">
+                    <Link href={`/student/content/${item.id}`} className="flex items-center gap-2 hover:text-primary transition-colors">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                      <h3 className="font-semibold text-base">{item.title}</h3>
+                    </Link>
+                    {isNew && (
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 mt-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Just Uploaded
+                      </div>
+                    )}
+                  </div>
+                  <Badge variant="secondary">{item.type}</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-3">
+                  Added {new Date(item.created_at).toLocaleDateString()}
+                </p>
               
               {quizConfigs[item.id] ? (
                 <div className="mt-auto pt-4">
@@ -221,7 +252,8 @@ export default function ContentPage() {
               )}
             </CardContent>
           </Card>
-        ))}
+        );
+      })}
       </div>
     </div>
   );

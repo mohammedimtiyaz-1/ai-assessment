@@ -1,5 +1,6 @@
 import Tesseract from 'tesseract.js';
 import { logger } from './logger';
+import { openai } from './ai';
 
 // Dynamic import for pdf-parse to avoid import issues
 const pdf = require('pdf-parse');
@@ -55,25 +56,58 @@ export async function extractPDFContent(buffer: Buffer): Promise<string> {
 }
 
 /**
- * Extract text content from an image file using OCR
+ * Extract text content from an image file using OpenAI GPT-4o Vision
+ * This extracts both text and describes visual elements (diagrams, charts, etc.)
  */
-export async function extractImageContent(buffer: Buffer): Promise<string> {
+export async function extractImageContent(buffer: Buffer, mimeType: string): Promise<string> {
   try {
-    const result = await Tesseract.recognize(
-      buffer,
-      'eng',
-      {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            logger.info({ progress: m.progress }, 'OCR progress');
-          }
-        }
-      }
-    );
-    return result.data.text;
+    logger.info({ mimeType }, 'Extracting image content using OpenAI Vision');
+    
+    const base64Image = buffer.toString('base64');
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { 
+              type: "text", 
+              text: "Analyze this image for educational purposes. Extract all visible text exactly as it appears. Additionally, describe any diagrams, charts, graphs, or visual concepts in detail so that a student can understand them. If the image is just a picture, describe what it depicts. The output should be a comprehensive textual representation of the image suitable for generating study questions." 
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 2000,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content returned from OpenAI Vision");
+    }
+
+    return content;
   } catch (error) {
-    logger.error({ error }, 'Failed to extract image content');
-    throw new Error('Failed to extract image content');
+    logger.error({ error }, 'Failed to extract image content using OpenAI Vision');
+    
+    // Fallback to Tesseract if OpenAI fails
+    try {
+      logger.info('Falling back to Tesseract OCR');
+      const result = await Tesseract.recognize(
+        buffer,
+        'eng'
+      );
+      return result.data.text;
+    } catch (fallbackError) {
+      logger.error({ fallbackError }, 'Tesseract fallback also failed');
+      throw new Error('Failed to extract image content');
+    }
   }
 }
 
@@ -82,13 +116,14 @@ export async function extractImageContent(buffer: Buffer): Promise<string> {
  */
 export async function extractContentFromFile(
   buffer: Buffer,
-  fileType: string
+  fileType: string,
+  mimeType: string
 ): Promise<string> {
   switch (fileType) {
     case 'pdf':
       return await extractPDFContent(buffer);
     case 'image':
-      return await extractImageContent(buffer);
+      return await extractImageContent(buffer, mimeType);
     case 'text':
       return buffer.toString('utf-8');
     default:
@@ -118,7 +153,7 @@ export async function processUploadedFile(
     let extractionError: string | null = null;
 
     try {
-      extractedContent = await extractContentFromFile(buffer, fileType);
+      extractedContent = await extractContentFromFile(buffer, fileType, metadata.mime_type);
       logger.info({ 
         fileName: metadata.original_file_name, 
         contentLength: extractedContent?.length 

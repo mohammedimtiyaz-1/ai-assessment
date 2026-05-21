@@ -78,7 +78,7 @@ export default function UploadPage() {
         }
         
         setDone(true);
-        setTimeout(() => router.push("/student/content"), 1000);
+        setTimeout(() => router.push(`/student/content?newId=${data.id}`), 1000);
       } else {
         setError(data.error || "Failed to upload content");
         setUploading(false);

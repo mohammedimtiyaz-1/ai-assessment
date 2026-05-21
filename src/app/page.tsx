@@ -57,12 +57,12 @@ export default function HomePage() {
             className="flex items-center justify-center gap-4 pt-4"
           >
             <Button size="lg" asChild className="gap-2">
-              <Link href="/student">
+              <Link href="/student/dashboard">
                 I'm a Student <ArrowRight className="w-5 h-5" />
               </Link>
             </Button>
             <Button size="lg" variant="secondary" asChild className="gap-2">
-              <Link href="/teacher">
+              <Link href="/teacher/dashboard">
                 I'm a Teacher <ArrowRight className="w-5 h-5" />
               </Link>
             </Button>

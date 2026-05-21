@@ -1,29 +1,19 @@
-import { Pool, type QueryResultRow } from "pg";
+import { createClient } from '@supabase/supabase-js';
 import { env } from "./env";
+import { logger } from "./logger";
 
 const globalForDb = globalThis as unknown as {
-  __dbPool?: Pool;
+  __supabase?: ReturnType<typeof createClient>;
 };
 
-export const pool =
-  globalForDb.__dbPool ??
-  new Pool({
-    connectionString: env.DATABASE_URL,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-  });
+// Use service role key for server-side operations if available, otherwise use anon key
+const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+logger.info({ url: supabaseUrl, hasServiceRole: !!env.SUPABASE_SERVICE_ROLE_KEY }, "Initializing Supabase client");
+
+export const supabase = globalForDb.__supabase ?? createClient(supabaseUrl, supabaseKey);
 
 if (env.NODE_ENV !== "production") {
-  globalForDb.__dbPool = pool;
-}
-
-export async function query<T extends QueryResultRow = any>(text: string, params?: any[]) {
-  const client = await pool.connect();
-  try {
-    const result = await client.query<T>(text, params);
-    return result;
-  } finally {
-    client.release();
-  }
+  globalForDb.__supabase = supabase;
 }

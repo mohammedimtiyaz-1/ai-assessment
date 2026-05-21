@@ -2,8 +2,9 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { query } from "./db";
+import { supabase } from "./db";
 import { env } from "./env";
+import { logger } from "./logger";
 
 // Enhanced password validation
 const passwordSchema = z.string()
@@ -28,24 +29,41 @@ export const authOptions = {
       },
       async authorize(credentials) {
         const parsed = credentialsSchema.safeParse(credentials);
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          logger.warn({ errors: parsed.error.format() }, "Invalid credentials format");
+          return null;
+        }
 
         const { email, password } = parsed.data;
-        const result = await query(
-          "SELECT id, email, password_hash, role FROM users WHERE email = $1",
-          [email]
-        );
-        const user = result.rows[0];
-        if (!user) return null;
+        try {
+          logger.info({ email }, "Attempting to authorize user");
+          const { data: user, error } = await supabase
+            .from('users')
+            .select('id, email, password_hash, role')
+            .eq('email', email)
+            .single();
 
-        const valid = await bcrypt.compare(password, user.password_hash);
-        if (!valid) return null;
+          if (error || !user) {
+            logger.warn({ email, error }, "User not found in database");
+            return null;
+          }
 
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        };
+          const valid = await bcrypt.compare(password, (user as any).password_hash);
+          if (!valid) {
+            logger.warn({ email }, "Invalid password");
+            return null;
+          }
+
+          logger.info({ email, role: (user as any).role }, "User authorized successfully");
+          return {
+            id: (user as any).id,
+            email: (user as any).email,
+            role: (user as any).role,
+          };
+        } catch (error) {
+          logger.error({ error, email }, "Error in authorize function");
+          throw error;
+        }
       },
     }),
   ],
@@ -58,6 +76,7 @@ export const authOptions = {
     async jwt({ token, user, trigger, session }: any) {
       if (user) {
         token.id = user.id;
+        token.sub = user.id;
         token.role = user.role;
       }
       
@@ -71,6 +90,7 @@ export const authOptions = {
     async session({ session, token }: any) {
       if (token) {
         session.user.id = token.id as string;
+        session.user.sub = token.id as string;
         session.user.role = token.role as string;
       }
       return session;
