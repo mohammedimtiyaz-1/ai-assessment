@@ -1,48 +1,53 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { getSupabaseAdmin } from "@/lib/db";
 
 export async function GET(_req: Request, { params }: { params: { sessionId: string } }) {
   const sessionId = params.sessionId;
+  const supabaseAdmin = getSupabaseAdmin();
 
   // Get session details
-  const sessionRes = await query(
-    `SELECT s.id, s.score, s.started_at, s.finished_at, s.status, s.question_ids, s.constraints_json
-     FROM quiz_sessions s WHERE s.id = $1`,
-    [sessionId]
-  );
+  const { data: sessionData } = await supabaseAdmin
+    .from('quiz_sessions')
+    .select('id, score, started_at, finished_at, status, question_ids, constraints_json')
+    .eq('id', sessionId)
+    .single();
 
-  if (sessionRes.rows.length === 0) {
+  if (!sessionData) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  const session = sessionRes.rows[0];
+  const session = sessionData as any;
 
   if (session.status !== "completed") {
     return NextResponse.json({ error: "Quiz not completed yet" }, { status: 400 });
   }
 
   // Get questions with correct answers
-  const questionsRes = await query(
-    `SELECT id, body, answers_json, correct_answer_key FROM questions WHERE id = ANY($1)`,
-    [session.question_ids]
-  );
+  const { data: questionsData } = await supabaseAdmin
+    .from('questions')
+    .select('id, body, answers_json, correct_answer_key')
+    .in('id', session.question_ids);
 
   // Get user answers
-  const answersRes = await query(
-    `SELECT question_id, answer_key, is_correct, answered_at FROM quiz_answers WHERE session_id = $1`,
-    [sessionId]
-  );
+  const { data: answersData } = await supabaseAdmin
+    .from('quiz_answers')
+    .select('question_id, answer_key, is_correct, answered_at')
+    .eq('session_id', sessionId);
 
   const answersMap = new Map(
-    answersRes.rows.map((a: any) => [a.question_id, { answerKey: a.answer_key, isCorrect: a.is_correct, answeredAt: a.answered_at }])
+    (answersData || []).map((a: any) => [a.question_id, { answerKey: a.answer_key, isCorrect: a.is_correct, answeredAt: a.answered_at }])
   );
 
-  const questionsWithAnswers = questionsRes.rows.map((q: any) => {
+  const questionsWithAnswers = (questionsData || []).map((q: any) => {
     const userAnswer = answersMap.get(q.id);
+    // Parse answers_json if it's a string
+    const answers = typeof q.answers_json === 'string' 
+      ? JSON.parse(q.answers_json) 
+      : q.answers_json;
     return {
       id: q.id,
       body: q.body,
-      answers: q.answers_json,
+      answers: answers,
       correctAnswer: q.correct_answer_key,
       userAnswer: userAnswer?.answerKey || null,
       isCorrect: userAnswer?.isCorrect || false,

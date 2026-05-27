@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase, getSupabaseAdmin } from "@/lib/db";
 import { generateQuestions } from "@/lib/ai";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -21,22 +21,25 @@ export const POST = withAuth(async (req: NextRequest, user) => {
 
     logger.info({ userId: user.id, contentId, difficulty, questionCount, questionType }, "Generating quiz");
 
-    // Fetch content
-    const contentRes = await query(
-      `SELECT title, type, storage_ref FROM content WHERE id = $1 AND owner_user_id = $2`,
-      [contentId, user.id]
-    );
+    const supabaseAdmin = getSupabaseAdmin();
 
-    if (contentRes.rows.length === 0) {
+    // Fetch content
+    const { data: content, error: contentError } = await supabaseAdmin
+      .from('content')
+      .select('title, type, storage_ref')
+      .eq('id', contentId)
+      .eq('owner_user_id', user.id)
+      .single();
+
+    if (contentError || !content) {
+      logger.error({ contentError, contentId, userId: user.id }, "Content not found in database");
       return NextResponse.json({ error: "Content not found" }, { status: 404 });
     }
 
-    const content = contentRes.rows[0];
-
     // Get text content from storage_ref (which contains the actual text for text uploads)
     let textContent = "";
-    if (content.storage_ref && typeof content.storage_ref === "string") {
-      textContent = content.storage_ref;
+    if ((content as any).storage_ref && typeof (content as any).storage_ref === "string") {
+      textContent = (content as any).storage_ref;
     }
 
     if (!textContent || !textContent.trim()) {
@@ -64,29 +67,40 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     const questionIds: string[] = [];
     for (const q of questions) {
       const questionId = crypto.randomUUID();
-      await query(
-        `INSERT INTO questions (id, source_content_id, body, answers_json, correct_answer_key, difficulty, question_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          questionId,
-          contentId,
-          q.body,
-          JSON.stringify(q.answers),
-          q.correctAnswer,
-          q.difficulty || difficulty === "mixed" ? "medium" : difficulty,
-          q.questionType || questionType === "mixed" ? "mcq" : questionType
-        ]
-      );
+      const { error: insertError } = await supabaseAdmin
+        .from('questions')
+        .insert({
+          id: questionId,
+          source_content_id: contentId,
+          body: q.body,
+          answers_json: JSON.stringify(q.answers),
+          correct_answer_key: q.correctAnswer,
+          difficulty: q.difficulty || difficulty === "mixed" ? "medium" : difficulty,
+          question_type: q.questionType || questionType === "mixed" ? "mcq" : questionType
+        } as any);
+
+      if (insertError) {
+        logger.error({ error: insertError }, "Failed to insert question");
+      }
       questionIds.push(questionId);
     }
 
     // Store quiz configuration
     const quizConfigId = crypto.randomUUID();
-    await query(
-      `INSERT INTO quiz_configurations (id, content_id, difficulty, question_type, question_count, question_ids)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [quizConfigId, contentId, difficulty, questionType, questionCount, questionIds]
-    );
+    const { error: configError } = await supabaseAdmin
+      .from('quiz_configurations')
+      .insert({
+        id: quizConfigId,
+        content_id: contentId,
+        difficulty,
+        question_type: questionType,
+        question_count: questionCount,
+        question_ids: questionIds
+      } as any);
+
+    if (configError) {
+      logger.error({ error: configError }, "Failed to insert quiz configuration");
+    }
 
     logger.info({ quizConfigId, contentId, questionCount }, "Quiz configuration created");
 

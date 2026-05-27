@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -15,18 +15,26 @@ export const DELETE = withAuth(async (req: NextRequest, user) => {
   const contentId = parts[parts.length - 1];
 
   // Verify ownership
-  const assessmentCheck = await query(
-    "SELECT id FROM assessments WHERE id = $1 AND owner_user_id = $2",
-    [id, user.id]
-  );
-  if (assessmentCheck.rows.length === 0) {
+  const { data: assessmentCheck } = await supabase
+    .from('assessments')
+    .select('id')
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+    .single();
+  
+  if (!assessmentCheck) {
     return NextResponse.json({ error: "Assessment not found" }, { status: 404 });
   }
 
-  await query(
-    "DELETE FROM assessment_content WHERE assessment_id = $1 AND content_id = $2",
-    [id, contentId]
-  );
+  const { error } = await supabase
+    .from('assessment_content')
+    .delete()
+    .eq('assessment_id', id)
+    .eq('content_id', contentId);
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to unlink content" }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 });

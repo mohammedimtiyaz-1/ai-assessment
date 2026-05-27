@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { generateQuestions } from "../ai";
 
+const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
+}));
+
 // Mock env module
 vi.mock("../env", () => ({
   env: {
@@ -15,27 +19,20 @@ vi.mock("../env", () => ({
 
 // Mock OpenAI with factory function
 vi.mock("openai", () => {
-  const mockCreate = vi.fn();
   return {
     default: vi.fn().mockImplementation(() => ({
       chat: {
         completions: {
-          create: mockCreate,
+          create: mocks.create,
         },
       },
     })),
-    __mockCreate: mockCreate,
   };
 });
 
 describe("AI Module", () => {
-  let mockCreate: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    const OpenAI = require("openai");
-    mockCreate = OpenAI.__mockCreate;
-    mockCreate.mockClear();
   });
 
   describe("generateQuestions", () => {
@@ -63,7 +60,7 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       const questions = await generateQuestions("Test content", { count: 5 });
 
@@ -83,7 +80,7 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       const result = await generateQuestions("Test content", { count: 1 });
 
@@ -100,13 +97,13 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       await expect(generateQuestions("Test content", { count: 5 })).rejects.toThrow();
     });
 
     it("should handle API errors gracefully", async () => {
-      mockCreate.mockRejectedValue(new Error("API Error"));
+      mocks.create.mockRejectedValue(new Error("API Error"));
 
       await expect(generateQuestions("Test content", { count: 5 })).rejects.toThrow("Failed to generate questions");
     });
@@ -121,7 +118,7 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       await expect(generateQuestions("Test content", { count: 1 })).rejects.toThrow("Failed to generate questions");
     });
@@ -136,11 +133,11 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       await generateQuestions("Test content");
 
-      expect(mockCreate).toHaveBeenCalledWith(
+      expect(mocks.create).toHaveBeenCalledWith(
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -162,11 +159,11 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       await generateQuestions("Test content", { count: 5 });
 
-      expect(mockCreate).toHaveBeenCalledWith(
+      expect(mocks.create).toHaveBeenCalledWith(
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -192,11 +189,11 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       await generateQuestions("Test content", { difficulty: "easy", count: 3 });
 
-      expect(mockCreate).toHaveBeenCalledWith(
+      expect(mocks.create).toHaveBeenCalledWith(
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -231,7 +228,7 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       const questions = await generateQuestions("Test content", { count: 1, questionType: "essay" });
 
@@ -260,7 +257,7 @@ describe("AI Module", () => {
           },
         ],
       };
-      mockCreate.mockResolvedValue(mockResponse);
+      mocks.create.mockResolvedValue(mockResponse);
 
       const questions = await generateQuestions("Test content", { count: 1, questionType: "fill-blanks" });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import { z } from "zod";
 
 const configSchema = z.object({
@@ -29,15 +29,18 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
   const { timeLimitSec, requireLogin, resultVisibility } = parsed.data;
 
   // Verify ownership
-  const assessmentCheck = await query(
-    "SELECT id, config_json FROM assessments WHERE id = $1 AND owner_user_id = $2",
-    [id, user.id]
-  );
-  if (assessmentCheck.rows.length === 0) {
+  const { data: assessmentCheck } = await supabase
+    .from('assessments')
+    .select('id, config_json')
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+    .single();
+  
+  if (!assessmentCheck) {
     return NextResponse.json({ error: "Assessment not found" }, { status: 404 });
   }
 
-  const currentConfig = assessmentCheck.rows[0].config_json || {};
+  const currentConfig = ((assessmentCheck as any).config_json as any) || {};
   const updatedConfig = {
     ...currentConfig,
     ...(timeLimitSec !== undefined && { timeLimitSec }),
@@ -45,10 +48,13 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
     ...(resultVisibility !== undefined && { resultVisibility }),
   };
 
-  await query(
-    "UPDATE assessments SET config_json = $1 WHERE id = $2",
-    [JSON.stringify(updatedConfig), id]
-  );
+  const { error } = await (supabase.from('assessments') as any)
+    .update({ config_json: updatedConfig as any })
+    .eq('id', id);
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to update config" }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, config: updatedConfig });
 });

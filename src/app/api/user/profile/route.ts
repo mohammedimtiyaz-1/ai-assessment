@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export const GET = withAuth(async (req: NextRequest, user) => {
-  const result = await query("SELECT id, email, name, role FROM users WHERE id = $1", [user.id]);
-  if (result.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(result.rows[0]);
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email, name, role')
+    .eq('id', user.id)
+    .single();
+  
+  if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(data);
 });
 
 export const PATCH = withAuth(async (req: NextRequest, user) => {
   const body = await req.json().catch(() => ({}));
   const { name } = body;
-  await query("UPDATE users SET name = $1, updated_at = now() WHERE id = $2", [name, user.id]);
+  const { error } = await (supabase.from('users') as any)
+    .update({ name, updated_at: new Date().toISOString() })
+    .eq('id', user.id);
+  
+  if (error) return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
   return NextResponse.json({ success: true });
 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase, getSupabaseAdmin } from "@/lib/db";
 import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
@@ -15,37 +15,46 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   let questionIds: string[] = [];
   let contentTitle = "Practice Quiz";
 
+  const supabaseAdmin = getSupabaseAdmin();
+
   // If quizConfigurationId is provided, use the pre-generated questions
   if (quizConfigurationId) {
-    const quizConfigRes = await query(
-      `SELECT qc.*, c.title as content_title
-       FROM quiz_configurations qc
-       JOIN content c ON qc.content_id = c.id
-       WHERE qc.id = $1 AND c.owner_user_id = $2`,
-      [quizConfigurationId, userId]
-    );
+    const { data: quizConfig, error } = await supabaseAdmin
+      .from('quiz_configurations')
+      .select('*, content!inner(title, owner_user_id)')
+      .eq('id', quizConfigurationId)
+      .eq('content.owner_user_id', userId)
+      .single();
 
-    if (quizConfigRes.rows.length === 0) {
+    if (error || !quizConfig) {
       return NextResponse.json({ error: "Quiz configuration not found" }, { status: 404 });
     }
 
-    const quizConfig = quizConfigRes.rows[0];
-    questionIds = quizConfig.question_ids;
-    contentTitle = quizConfig.content_title;
+    questionIds = (quizConfig as any).question_ids as string[];
+    contentTitle = ((quizConfig as any).content as any)?.title;
   } else if (contentId) {
     // Fallback to old behavior - fetch questions by contentId
-    const contentRes = await query("SELECT * FROM content WHERE id = $1 AND owner_user_id = $2", [contentId, userId]);
-    if (contentRes.rows.length === 0) {
+    const { data: content, error: contentError } = await supabaseAdmin
+      .from('content')
+      .select('*')
+      .eq('id', contentId)
+      .eq('owner_user_id', userId)
+      .single();
+
+    if (contentError || !content) {
       return NextResponse.json({ error: "Content not found" }, { status: 404 });
     }
 
-    contentTitle = contentRes.rows[0].title;
+    contentTitle = (content as any).title;
 
-    const questionsRes = await query(
-      "SELECT id FROM questions WHERE source_content_id = $1 ORDER BY created_at LIMIT 10",
-      [contentId]
-    );
-    questionIds = questionsRes.rows.map((r) => r.id);
+    const { data: questions } = await supabaseAdmin
+      .from('questions')
+      .select('id')
+      .eq('source_content_id', contentId)
+      .order('created_at', { ascending: true })
+      .limit(10);
+
+    questionIds = (questions || []).map((r: any) => r.id);
   } else {
     return NextResponse.json({ error: "Either contentId or quizConfigurationId is required" }, { status: 400 });
   }
@@ -55,21 +64,41 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   }
 
   const sessionId = randomUUID();
-  const constraints = { timeLimitSec: 900, resultVisibility: "immediate_full" };
+  const constraints = { timeLimitSec: 3600, resultVisibility: "immediate_full" };
+  const now = new Date().toISOString();
 
   // Create a temporary assessment for student-generated quizzes
   const assessmentId = randomUUID();
-  await query(
-    `INSERT INTO assessments (id, owner_user_id, title, description, config_json, status)
-     VALUES ($1, $2, $3, $4, $5, 'published')`,
-    [assessmentId, userId, `Practice: ${contentTitle}`, 'Student-generated practice quiz', JSON.stringify(constraints)]
-  );
+  const { error: assessmentError } = await supabaseAdmin
+    .from('assessments')
+    .insert({
+      id: assessmentId,
+      owner_user_id: userId,
+      title: `Practice: ${contentTitle}`,
+      description: 'Student-generated practice quiz',
+      config_json: constraints as any,
+      status: 'published'
+    } as any);
 
-  await query(
-    `INSERT INTO quiz_sessions (id, user_id, assessment_id, constraints_json, question_ids, status)
-     VALUES ($1, $2, $3, $4, $5, 'active')`,
-    [sessionId, userId, assessmentId, JSON.stringify(constraints), questionIds]
-  );
+  if (assessmentError) {
+    return NextResponse.json({ error: "Failed to create assessment" }, { status: 500 });
+  }
+
+  const { error: sessionError } = await supabaseAdmin
+    .from('quiz_sessions')
+    .insert({
+      id: sessionId,
+      user_id: userId,
+      assessment_id: assessmentId,
+      constraints_json: constraints as any,
+      question_ids: questionIds,
+      status: 'active',
+      started_at: now
+    } as any);
+
+  if (sessionError) {
+    return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+  }
 
   return NextResponse.json({ sessionId });
 });

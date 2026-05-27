@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { getSupabaseAdmin } from "@/lib/db";
 
 export const GET = withAuth(async (req: NextRequest, user) => {
   const userId = user.id;
+  const supabaseAdmin = getSupabaseAdmin();
 
-  const result = await query(
-    `SELECT s.id, COALESCE(a.title, 'Practice') as assessment_title, s.score, s.finished_at, s.status
-     FROM quiz_sessions s
-     LEFT JOIN assessments a ON s.assessment_id = a.id
-     WHERE s.user_id = $1
-     ORDER BY s.created_at DESC`,
-    [userId]
-  );
+  const { data, error } = await supabaseAdmin
+    .from('quiz_sessions')
+    .select('id, score, finished_at, status, assessments!inner(title)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
 
-  return NextResponse.json({ attempts: result.rows });
+  if (error) {
+    return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
+  }
+
+  const attempts = (data || []).map((row: any) => ({
+    id: row.id,
+    assessment_title: row.assessments?.title || 'Practice',
+    score: row.score,
+    finished_at: row.finished_at,
+    status: row.status,
+  }));
+
+  return NextResponse.json({ attempts });
 });

@@ -35,7 +35,8 @@ export default function SignupPage() {
         return;
       }
       const signInRes = await signIn("credentials", {
-        redirect: false,
+        redirect: true,
+        callbackUrl: "/student/dashboard",
         email,
         password,
       });
@@ -43,7 +44,6 @@ export default function SignupPage() {
         router.push("/login");
         return;
       }
-      router.push("/student/dashboard");
     } catch {
       setError("Something went wrong");
       setLoading(false);

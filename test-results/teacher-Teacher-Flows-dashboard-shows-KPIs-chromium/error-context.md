@@ -7,149 +7,134 @@
 # Test info
 
 - Name: teacher.spec.ts >> Teacher Flows >> dashboard shows KPIs
-- Location: tests/teacher.spec.ts:23:7
+- Location: tests/teacher.spec.ts:36:7
 
 # Error details
 
 ```
 Error: expect(locator).toBeVisible() failed
 
-Locator: locator('text=Assessments')
+Locator: locator('text=Teacher Dashboard')
 Expected: visible
-Error: strict mode violation: locator('text=Assessments') resolved to 3 elements:
-    1) <a href="/teacher/assessments" class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground">…</a> aka getByRole('link', { name: 'Assessments' })
-    2) <h3 class="tracking-tight text-sm font-medium text-muted-foreground">Assessments</h3> aka getByRole('heading', { name: 'Assessments', exact: true })
-    3) <h3 class="font-semibold tracking-tight text-base">Recent Assessments</h3> aka getByRole('heading', { name: 'Recent Assessments' })
+Timeout: 5000ms
+Error: element(s) not found
 
 Call log:
   - Expect "toBeVisible" with timeout 5000ms
-  - waiting for locator('text=Assessments')
+  - waiting for locator('text=Teacher Dashboard')
+    - waiting for" http://localhost:3000/teacher/dashboard" navigation to finish...
+    - navigated to "http://localhost:3000/teacher/dashboard"
 
-```
-
-# Page snapshot
-
-```yaml
-- generic [active] [ref=e1]:
-  - alert [ref=e2]
-  - generic [ref=e3]:
-    - complementary [ref=e4]:
-      - link "AI Assessment" [ref=e6] [cursor=pointer]:
-        - /url: /dashboard
-        - img [ref=e7]
-        - generic [ref=e10]: AI Assessment
-      - navigation [ref=e11]:
-        - link "Dashboard" [ref=e12] [cursor=pointer]:
-          - /url: /dashboard
-          - img [ref=e13]
-          - text: Dashboard
-        - link "Assessments" [ref=e18] [cursor=pointer]:
-          - /url: /teacher/assessments
-          - img [ref=e19]
-          - text: Assessments
-        - link "Profile" [ref=e23] [cursor=pointer]:
-          - /url: /profile
-          - img [ref=e24]
-          - text: Profile
-        - link "Settings" [ref=e27] [cursor=pointer]:
-          - /url: /settings
-          - img [ref=e28]
-          - text: Settings
-        - button "Sign out" [ref=e31] [cursor=pointer]:
-          - img [ref=e32]
-          - text: Sign out
-    - generic [ref=e35]:
-      - banner [ref=e36]:
-        - generic [ref=e37]:
-          - generic [ref=e38]: teacher@example.com
-          - generic [ref=e39]: T
-      - main [ref=e40]:
-        - generic [ref=e41]:
-          - generic [ref=e42]:
-            - heading "Teacher Dashboard" [level=1] [ref=e43]
-            - link "New Assessment" [ref=e44] [cursor=pointer]:
-              - /url: /teacher/assessments
-              - button "New Assessment" [ref=e45]:
-                - img [ref=e46]
-                - text: New Assessment
-          - generic [ref=e47]:
-            - generic [ref=e48]:
-              - heading "Assessments" [level=3] [ref=e50]
-              - generic [ref=e52]: "1"
-            - generic [ref=e53]:
-              - heading "Published" [level=3] [ref=e55]
-              - generic [ref=e57]: "1"
-            - generic [ref=e58]:
-              - heading "Total Attempts" [level=3] [ref=e60]
-              - generic [ref=e62]: "0"
-          - generic [ref=e63]:
-            - heading "Recent Assessments" [level=3] [ref=e65]
-            - generic [ref=e66]:
-              - generic [ref=e67]:
-                - generic [ref=e68]:
-                  - img [ref=e69]
-                  - generic [ref=e72]: Biology Quiz A
-                - generic [ref=e73]: published
-              - link "View all" [ref=e74] [cursor=pointer]:
-                - /url: /teacher/assessments
-                - button "View all" [ref=e75]:
-                  - text: View all
-                  - img [ref=e76]
 ```
 
 # Test source
 
 ```ts
-  1  | import { test, expect } from "@playwright/test";
-  2  | 
-  3  | // Use seeded teacher credentials
-  4  | const TEACHER_EMAIL = "teacher@example.com";
-  5  | const TEACHER_PASSWORD = "password123";
-  6  | 
-  7  | async function loginAsTeacher(page: any) {
-  8  |   await page.goto("/login");
-  9  |   await page.fill('input[id="email"]', TEACHER_EMAIL);
-  10 |   await page.fill('input[id="password"]', TEACHER_PASSWORD);
-  11 |   await page.click('button[type="submit"]');
-  12 |   // After login, teacher should be redirected to /dashboard
-  13 |   // But if middleware doesn't know role, it may go to /student/dashboard
-  14 |   // So we accept either dashboard URL
-  15 |   await page.waitForURL(/\/(dashboard|student\/dashboard)/, { timeout: 10000 });
-  16 | }
-  17 | 
-  18 | test.describe("Teacher Flows", () => {
-  19 |   test.beforeEach(async ({ page }) => {
-  20 |     await loginAsTeacher(page);
-  21 |   });
-  22 | 
-  23 |   test("dashboard shows KPIs", async ({ page }) => {
-  24 |     await expect(page.locator("text=Teacher Dashboard")).toBeVisible();
-> 25 |     await expect(page.locator("text=Assessments")).toBeVisible();
-     |                                                    ^ Error: expect(locator).toBeVisible() failed
-  26 |     await expect(page.locator("text=Published")).toBeVisible();
-  27 |     await expect(page.locator("text=Total Attempts")).toBeVisible();
-  28 |   });
-  29 | 
-  30 |   test("navigate to assessments list", async ({ page }) => {
-  31 |     await page.click("text=View all");
-  32 |     await expect(page).toHaveURL(/\/teacher\/assessments/);
-  33 |     await expect(page.locator("text=Assessments")).toBeVisible();
-  34 |   });
-  35 | 
-  36 |   test("create new assessment", async ({ page }) => {
-  37 |     await page.goto("/teacher/assessments");
-  38 |     page.on("dialog", async (dialog: any) => {
-  39 |       await dialog.accept("Playwright Test Assessment");
-  40 |     });
-  41 |     await page.click("text=Create");
-  42 |     await expect(page.locator("text=Playwright Test Assessment")).toBeVisible();
-  43 |   });
-  44 | 
-  45 |   test("sidebar logo links to teacher dashboard", async ({ page }) => {
-  46 |     await page.goto("/teacher/assessments");
-  47 |     await page.click("text=AI Assessment");
-  48 |     await expect(page).toHaveURL(/\/dashboard/);
-  49 |   });
-  50 | });
-  51 | 
+  1   | import { test, expect } from "@playwright/test";
+  2   | 
+  3   | // Use seeded teacher credentials
+  4   | const TEACHER_EMAIL = "teacher@example.com";
+  5   | const TEACHER_PASSWORD = "password123";
+  6   | 
+  7   | async function loginAsTeacher(page: any) {
+  8   |   await page.goto("/login");
+  9   |   await page.fill('input[id="email"]', TEACHER_EMAIL);
+  10  |   await page.fill('input[id="password"]', TEACHER_PASSWORD);
+  11  |   await page.click('button[type="submit"]');
+  12  |   // After login, teacher should be redirected to /dashboard
+  13  |   // But if middleware doesn't know role, it may go to /student/dashboard
+  14  |   // So we accept either dashboard URL
+  15  |   await page.waitForURL(/\/(dashboard|student\/dashboard)/, { timeout: 10000 });
+  16  | }
+  17  | 
+  18  | async function stubTeacherContent(page: any) {
+  19  |   await page.route("**/api/teacher/content", (route: any) => {
+  20  |     route.fulfill({
+  21  |       contentType: "application/json",
+  22  |       body: JSON.stringify({
+  23  |         content: [
+  24  |           { id: "content-1", title: "Sample Lesson", type: "pdf" },
+  25  |         ],
+  26  |       }),
+  27  |     });
+  28  |   });
+  29  | }
+  30  | 
+  31  | test.describe("Teacher Flows", () => {
+  32  |   test.beforeEach(async ({ page }) => {
+  33  |     await loginAsTeacher(page);
+  34  |   });
+  35  | 
+  36  |   test("dashboard shows KPIs", async ({ page }) => {
+> 37  |     await expect(page.locator("text=Teacher Dashboard")).toBeVisible();
+      |                                                          ^ Error: expect(locator).toBeVisible() failed
+  38  |     await expect(page.locator("text=Assessments")).toBeVisible();
+  39  |     await expect(page.locator("text=Published")).toBeVisible();
+  40  |     await expect(page.locator("text=Total Attempts")).toBeVisible();
+  41  |   });
+  42  | 
+  43  |   test("navigate to assessments list", async ({ page }) => {
+  44  |     await page.click("text=View all");
+  45  |     await expect(page).toHaveURL(/\/teacher\/assessments/);
+  46  |     await expect(page.locator("text=Assessments")).toBeVisible();
+  47  |   });
+  48  | 
+  49  |   test("create new assessment", async ({ page }) => {
+  50  |     await page.goto("/teacher/assessments");
+  51  |     page.on("dialog", async (dialog: any) => {
+  52  |       await dialog.accept("Playwright Test Assessment");
+  53  |     });
+  54  |     await page.click("text=Create");
+  55  |     await expect(page.locator("text=Playwright Test Assessment")).toBeVisible();
+  56  |   });
+  57  | 
+  58  |   test("sidebar logo links to teacher dashboard", async ({ page }) => {
+  59  |     await page.goto("/teacher/assessments");
+  60  |     await page.click("text=AI Assessment");
+  61  |     await expect(page).toHaveURL(/\/teacher\/dashboard/);
+  62  |   });
+  63  | 
+  64  |   test("validation: title is required", async ({ page }) => {
+  65  |     await page.goto("/teacher/assessments/create");
+  66  |     await page.click("text=Create Assessment");
+  67  |     await expect(page.getByText("Title must be at least 3 characters")).toBeVisible();
+  68  |   });
+  69  | 
+  70  |   test("validation: content selection required", async ({ page }) => {
+  71  |     await stubTeacherContent(page);
+  72  |     await page.goto("/teacher/assessments/create");
+  73  |     await page.fill('#title', 'Valid Assessment Title');
+  74  |     await page.click('text=Create Assessment');
+  75  |     await expect(page.getByText("Please select content to generate questions from")).toBeVisible();
+  76  |   });
+  77  | 
+  78  |   test("validation: question count boundaries", async ({ page }) => {
+  79  |     await stubTeacherContent(page);
+  80  |     await page.goto("/teacher/assessments/create");
+  81  |     await page.fill('#title', 'Boundary Test');
+  82  |     await page.click('button:has-text("Sample Lesson")');
+  83  |     await page.fill('#questionCount', '0');
+  84  |     await page.click('text=Create Assessment');
+  85  |     await expect(page.getByText("Number of questions must be between 1 and 100")).toBeVisible();
+  86  |   });
+  87  | 
+  88  |   test("validation: at least one question type required", async ({ page }) => {
+  89  |     await stubTeacherContent(page);
+  90  |     await page.goto("/teacher/assessments/create");
+  91  |     await page.fill('#title', 'Question Type Test');
+  92  |     await page.click('button:has-text("Sample Lesson")');
+  93  | 
+  94  |     const typeIds = ["mcq", "fill_blanks", "true_false", "short_answer", "essay", "riddle"];
+  95  |     for (const id of typeIds) {
+  96  |       const locator = page.locator(`#${id}`);
+  97  |       if (await locator.isChecked()) {
+  98  |         await locator.uncheck();
+  99  |       }
+  100 |     }
+  101 | 
+  102 |     await page.click('text=Create Assessment');
+  103 |     await expect(page.getByText("Please select at least one question type")).toBeVisible();
+  104 |   });
+  105 | });
+  106 | 
 ```

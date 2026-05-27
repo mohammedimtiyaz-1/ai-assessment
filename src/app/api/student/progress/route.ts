@@ -1,52 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { getSupabaseAdmin } from "@/lib/db";
 
 export const GET = withAuth(async (req: NextRequest, user) => {
   const userId = user.id;
+  const supabaseAdmin = getSupabaseAdmin();
 
-  const totalRes = await query(
-    "SELECT COUNT(*) as count, COALESCE(AVG(score), 0) as avg FROM quiz_sessions WHERE user_id = $1 AND status = 'completed'",
-    [userId]
-  );
-  const activeRes = await query("SELECT COUNT(*) as count FROM quiz_sessions WHERE user_id = $1", [userId]);
+  const [totalRes, activeRes] = await Promise.all([
+    supabaseAdmin.from('quiz_sessions').select('score').eq('user_id', userId).eq('status', 'completed'),
+    supabaseAdmin.from('quiz_sessions').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+  ]);
 
-  const totalAttempts = parseInt(totalRes.rows[0].count, 10);
-  const averageScore = totalAttempts > 0 ? Math.round(parseFloat(totalRes.rows[0].avg)) : 0;
-  const activeCount = parseInt(activeRes.rows[0].count, 10);
+  const totalAttempts = totalRes.data?.length || 0;
+  const scores = (totalRes.data || []).map((r: any) => r.score).filter((s: any) => s != null);
+  const averageScore = scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0;
+  const activeCount = activeRes.count || 0;
   const completionRate = activeCount > 0 ? Math.round((totalAttempts / activeCount) * 100) : 0;
 
   // Calculate weak areas based on question performance by content
   let weakAreas: string[] = [];
   if (totalAttempts > 0) {
-    const weakAreasRes = await query(
-      `SELECT c.title, AVG(qa.is_correct::int) as accuracy
-       FROM quiz_answers qa
-       JOIN quiz_sessions qs ON qa.session_id = qs.id
-       JOIN questions q ON qa.question_id = q.id
-       LEFT JOIN content c ON q.source_content_id = c.id
-       WHERE qs.user_id = $1 AND qs.status = 'completed'
-       GROUP BY c.title
-       HAVING COUNT(*) >= 3
-       ORDER BY accuracy ASC
-       LIMIT 3`,
-      [userId]
-    );
-    weakAreas = weakAreasRes.rows
-      .filter((row) => row.accuracy < 0.7)
-      .map((row) => row.title || "General");
+    const { data: weakAreasData } = await supabaseAdmin
+      .from('quiz_answers')
+      .select('is_correct, quiz_sessions!inner(user_id, status), questions!inner(source_content_id), content!inner(title)')
+      .eq('quiz_sessions.user_id', userId)
+      .eq('quiz_sessions.status', 'completed');
+
+    // Group by content title and calculate accuracy
+    const contentAccuracy = new Map<string, { correct: number; total: number }>();
+    (weakAreasData || []).forEach((row: any) => {
+      const title = row.content?.title || "General";
+      const current = contentAccuracy.get(title) || { correct: 0, total: 0 };
+      current.total++;
+      if (row.is_correct) current.correct++;
+      contentAccuracy.set(title, current);
+    });
+
+    weakAreas = Array.from(contentAccuracy.entries())
+      .filter(([_, stats]) => stats.total >= 3 && stats.correct / stats.total < 0.7)
+      .map(([title]) => title)
+      .slice(0, 3);
   }
 
   // Get recent trend (last 10 completed sessions with scores)
-  const recentTrendRes = await query(
-    `SELECT score, finished_at
-     FROM quiz_sessions
-     WHERE user_id = $1 AND status = 'completed'
-     ORDER BY finished_at DESC
-     LIMIT 10`,
-    [userId]
-  );
-  const recentTrend = recentTrendRes.rows.reverse().map((row) => ({
+  const { data: recentTrendData } = await supabaseAdmin
+    .from('quiz_sessions')
+    .select('score, finished_at')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('finished_at', { ascending: false })
+    .limit(10);
+
+  const recentTrend = (recentTrendData || []).reverse().map((row: any) => ({
     score: row.score,
     date: row.finished_at,
   }));

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { getSupabaseAdmin } from "@/lib/db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { logger } from "@/lib/logger";
@@ -32,14 +32,20 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
   logger.info({ userId: user.id, userEmail: user.email, userRole: user.role }, "Fetching teacher assessments");
 
-  const result = await query(
-    "SELECT id, title, description, status, created_at FROM assessments WHERE owner_user_id = $1 ORDER BY created_at DESC",
-    [user.id]
-  );
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error } = await supabaseAdmin
+    .from('assessments')
+    .select('id, title, description, status, created_at')
+    .eq('owner_user_id', user.id)
+    .order('created_at', { ascending: false });
 
-  logger.info({ userId: user.id, count: result.rows.length }, "Teacher assessments fetched");
+  if (error) {
+    return NextResponse.json({ error: "Failed to fetch assessments" }, { status: 500 });
+  }
 
-  return NextResponse.json({ assessments: result.rows });
+  logger.info({ userId: user.id, count: data?.length }, "Teacher assessments fetched");
+
+  return NextResponse.json({ assessments: data || [] });
 });
 
 export const POST = withAuth(async (req: NextRequest, user) => {
@@ -49,12 +55,14 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   }
 
   try {
-    const userCheck = await query(
-      "SELECT id FROM users WHERE id = $1",
-      [user.id]
-    );
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: userCheck, error: userCheckError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .single();
 
-    if (userCheck.rows.length === 0) {
+    if (userCheckError || !userCheck) {
       return NextResponse.json({ error: "User not found. Please log out and log in again." }, { status: 400 });
     }
 
@@ -80,25 +88,26 @@ export const POST = withAuth(async (req: NextRequest, user) => {
 
     const finalConfig = userConfig ? { ...defaultConfig, ...userConfig } : defaultConfig;
 
-    await query(
-      "INSERT INTO assessments (id, owner_user_id, title, description, ai_note, config_json, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [id, user.id, title, description || null, aiNote || null, JSON.stringify(finalConfig), "created"]
-    );
+    const { error: insertError } = await supabaseAdmin
+      .from('assessments')
+      .insert({
+        id,
+        owner_user_id: user.id,
+        title,
+        description: description || null,
+        ai_note: aiNote || null,
+        config_json: finalConfig as any,
+        status: "created"
+      } as any);
+
+    if (insertError) {
+      logger.error({ error: insertError }, "Failed to create assessment");
+      return NextResponse.json({ error: "Failed to create assessment", details: insertError.message }, { status: 500 });
+    }
 
     return NextResponse.json({ id, title, status: "created" }, { status: 201 });
   } catch (error: any) {
-    console.error("Error creating assessment:", error);
-    console.error("Error details:", {
-      message: error.message,
-      code: error.code,
-      detail: error.detail,
-      constraint: error.constraint,
-    });
-    
-    if (error.code === '23503') {
-      return NextResponse.json({ error: "User not found. Please log out and log in again." }, { status: 400 });
-    }
-    
+    logger.error({ error }, "Error creating assessment");
     return NextResponse.json({ error: "Failed to create assessment", details: error.message }, { status: 500 });
   }
 });

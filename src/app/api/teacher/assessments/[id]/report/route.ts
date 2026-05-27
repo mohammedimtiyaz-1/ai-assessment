@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export const GET = withAuth(async (req: NextRequest, user) => {
   const role = user.role;
@@ -11,36 +11,50 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const parts = req.nextUrl.pathname.split("/");
   const id = parts[parts.length - 2];
 
-  const assessRes = await query(
-    "SELECT title FROM assessments WHERE id = $1 AND owner_user_id = $2",
-    [id, user.id]
-  );
-  if (assessRes.rows.length === 0) {
+  const { data: assessRes } = await supabase
+    .from('assessments')
+    .select('title')
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+    .single();
+  
+  if (!assessRes) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const totalRes = await query(
-    "SELECT COUNT(*) as count FROM quiz_sessions WHERE assessment_id = $1",
-    [id]
-  );
-  const completedRes = await query(
-    "SELECT COUNT(*) as count, COALESCE(AVG(score), 0) as avg FROM quiz_sessions WHERE assessment_id = $1 AND status = 'completed'",
-    [id]
-  );
-  const studentsRes = await query(
-    `SELECT COALESCE(u.name, s.guest_name, 'Guest') as name, s.score, s.finished_at
-     FROM quiz_sessions s
-     LEFT JOIN users u ON s.user_id = u.id
-     WHERE s.assessment_id = $1
-     ORDER BY s.created_at DESC`,
-    [id]
-  );
+  const { count: totalRes } = await supabase
+    .from('quiz_sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('assessment_id', id);
+
+  const { data: completedData } = await supabase
+    .from('quiz_sessions')
+    .select('score')
+    .eq('assessment_id', id)
+    .eq('status', 'completed');
+  
+  const completions = completedData?.length || 0;
+  const averageScore = completions > 0 
+    ? Math.round((completedData || []).reduce((sum: number, s: any) => sum + (s.score || 0), 0) / completions)
+    : null;
+
+  const { data: studentsRes } = await supabase
+    .from('quiz_sessions')
+    .select('user_id, guest_name, score, finished_at, users!inner(name)')
+    .eq('assessment_id', id)
+    .order('created_at', { ascending: false });
+
+  const studentResults = (studentsRes || []).map((s: any) => ({
+    name: s.users?.name || s.guest_name || 'Guest',
+    score: s.score,
+    finished_at: s.finished_at
+  }));
 
   return NextResponse.json({
-    assessmentTitle: assessRes.rows[0].title,
-    totalAttempts: parseInt(totalRes.rows[0].count, 10),
-    completions: parseInt(completedRes.rows[0].count, 10),
-    averageScore: completedRes.rows[0].avg ? Math.round(parseFloat(completedRes.rows[0].avg)) : null,
-    studentResults: studentsRes.rows,
+    assessmentTitle: (assessRes as any).title,
+    totalAttempts: totalRes || 0,
+    completions,
+    averageScore,
+    studentResults,
   });
 });

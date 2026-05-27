@@ -42,7 +42,15 @@ export default function QuizResultsPage({ params }: { params: { quizSessionId: s
           router.push("/student/dashboard");
           return;
         }
-        setResults(d);
+        // Parse answers if they're strings
+        const parsedResults = {
+          ...d,
+          questions: d.questions?.map((q: any) => ({
+            ...q,
+            answers: typeof q.answers === 'string' ? JSON.parse(q.answers) : (Array.isArray(q.answers) ? q.answers : [])
+          }))
+        };
+        setResults(parsedResults);
         setLoading(false);
       })
       .catch(() => setLoading(false));

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -19,11 +19,12 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const parts = req.nextUrl.pathname.split("/");
   const id = parts[parts.length - 2];
 
-  const result = await query(
-    "SELECT token, active FROM assessment_links WHERE assessment_id = $1",
-    [id]
-  );
-  return NextResponse.json({ links: result.rows });
+  const { data } = await supabase
+    .from('assessment_links')
+    .select('token, active')
+    .eq('assessment_id', id);
+  
+  return NextResponse.json({ links: data || [] });
 });
 
 export const POST = withAuth(async (req: NextRequest, user) => {
@@ -35,24 +36,38 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   const parts = req.nextUrl.pathname.split("/");
   const id = parts[parts.length - 2];
 
-  const ownership = await query(
-    "SELECT id, config_json FROM assessments WHERE id = $1 AND owner_user_id = $2",
-    [id, user.id]
-  );
-  if (ownership.rows.length === 0) {
+  const { data: ownership } = await supabase
+    .from('assessments')
+    .select('id, config_json')
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+    .single();
+  
+  if (!ownership) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const assessmentConfig = ownership.rows[0].config_json || {};
+  const assessmentConfig = (ownership as any).config_json || {};
   const requireLogin = assessmentConfig.requireLogin ?? true;
 
   const token = generateToken();
   const accessCode = generateToken().substring(0, 6).toUpperCase();
   const accessCodeHash = await bcrypt.hash(accessCode, 10);
-  await query(
-    "INSERT INTO assessment_links (id, assessment_id, token, access_code_hash, active, require_login) VALUES ($1, $2, $3, $4, true, $5)",
-    [randomUUID(), id, token, accessCodeHash, requireLogin]
-  );
+  
+  const { error } = await supabase
+    .from('assessment_links')
+    .insert({
+      id: randomUUID(),
+      assessment_id: id,
+      token,
+      access_code_hash: accessCodeHash,
+      active: true,
+      require_login: requireLogin
+    } as any);
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to create link" }, { status: 500 });
+  }
 
   return NextResponse.json({ token, accessCode });
 });

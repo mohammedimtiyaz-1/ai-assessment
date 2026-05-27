@@ -15,6 +15,19 @@ async function loginAsTeacher(page: any) {
   await page.waitForURL(/\/(dashboard|student\/dashboard)/, { timeout: 10000 });
 }
 
+async function stubTeacherContent(page: any) {
+  await page.route("**/api/teacher/content", (route: any) => {
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        content: [
+          { id: "content-1", title: "Sample Lesson", type: "pdf" },
+        ],
+      }),
+    });
+  });
+}
+
 test.describe("Teacher Flows", () => {
   test.beforeEach(async ({ page }) => {
     await loginAsTeacher(page);
@@ -45,6 +58,48 @@ test.describe("Teacher Flows", () => {
   test("sidebar logo links to teacher dashboard", async ({ page }) => {
     await page.goto("/teacher/assessments");
     await page.click("text=AI Assessment");
-    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page).toHaveURL(/\/teacher\/dashboard/);
+  });
+
+  test("validation: title is required", async ({ page }) => {
+    await page.goto("/teacher/assessments/create");
+    await page.click("text=Create Assessment");
+    await expect(page.getByText("Title must be at least 3 characters")).toBeVisible();
+  });
+
+  test("validation: content selection required", async ({ page }) => {
+    await stubTeacherContent(page);
+    await page.goto("/teacher/assessments/create");
+    await page.fill('#title', 'Valid Assessment Title');
+    await page.click('text=Create Assessment');
+    await expect(page.getByText("Please select content to generate questions from")).toBeVisible();
+  });
+
+  test("validation: question count boundaries", async ({ page }) => {
+    await stubTeacherContent(page);
+    await page.goto("/teacher/assessments/create");
+    await page.fill('#title', 'Boundary Test');
+    await page.click('button:has-text("Sample Lesson")');
+    await page.fill('#questionCount', '0');
+    await page.click('text=Create Assessment');
+    await expect(page.getByText("Number of questions must be between 1 and 100")).toBeVisible();
+  });
+
+  test("validation: at least one question type required", async ({ page }) => {
+    await stubTeacherContent(page);
+    await page.goto("/teacher/assessments/create");
+    await page.fill('#title', 'Question Type Test');
+    await page.click('button:has-text("Sample Lesson")');
+
+    const typeIds = ["mcq", "fill_blanks", "true_false", "short_answer", "essay", "riddle"];
+    for (const id of typeIds) {
+      const locator = page.locator(`#${id}`);
+      if (await locator.isChecked()) {
+        await locator.uncheck();
+      }
+    }
+
+    await page.click('text=Create Assessment');
+    await expect(page.getByText("Please select at least one question type")).toBeVisible();
   });
 });

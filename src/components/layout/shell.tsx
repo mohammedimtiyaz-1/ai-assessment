@@ -33,18 +33,29 @@ const studentLinks = [
 ];
 
 const teacherLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/teacher/assessments", label: "Assessments", icon: FileQuestion },
+  { href: "/teacher/content", label: "Content", icon: BookOpen },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+type AppShellMode = "student" | "teacher" | "auto";
+
+interface AppShellProps {
+  children: React.ReactNode;
+  mode?: AppShellMode;
+}
+
+export function AppShell({ children, mode = "auto" }: AppShellProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const role = session?.user?.role;
-  const isStudent = role === "student";
-  const isTeacher = ["teacher", "admin", "super_admin"].includes(role || "");
+  const inferredTeacher = ["teacher", "admin", "super_admin"].includes(role || "");
+  const inferredStudent = role === "student";
+
+  const isTeacher = mode === "teacher" || (mode === "auto" && inferredTeacher);
+  const isStudent = mode === "student" || (mode === "auto" && inferredStudent);
   const links = isTeacher ? teacherLinks : studentLinks;
 
   return (
@@ -61,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="flex h-16 items-center border-b px-6 border-white/10">
           <Link
-            href={isTeacher ? "/dashboard" : "/student/dashboard"}
+            href={isTeacher ? "/teacher/dashboard" : "/student/dashboard"}
             className="flex items-center gap-2 font-bold text-lg text-indigo-400"
           >
             <Sparkles className="h-6 w-6" />

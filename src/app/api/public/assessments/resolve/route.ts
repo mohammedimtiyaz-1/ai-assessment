@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -8,31 +8,30 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
   }
 
-  const linkRes = await query(
-    `SELECT l.*, a.id as assessment_id, a.title, a.description, a.config_json, a.status
-     FROM assessment_links l
-     JOIN assessments a ON l.assessment_id = a.id
-     WHERE l.token = $1`,
-    [token]
-  );
+  const { data: linkData } = await supabase
+    .from('assessment_links')
+    .select('*, assessments!inner(id, title, description, config_json, status)')
+    .eq('token', token)
+    .single();
 
-  if (linkRes.rows.length === 0) {
+  if (!linkData) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const link = linkRes.rows[0];
+  const link = linkData as any;
+  const assessment = link.assessments;
   const now = new Date();
   if (!link.active || (link.expiry_at && new Date(link.expiry_at) < now)) {
     return NextResponse.json({ error: "Link expired or inactive" }, { status: 410 });
   }
 
   return NextResponse.json({
-    id: link.assessment_id,
-    title: link.title,
-    description: link.description,
-    config: link.config_json || {},
+    id: assessment.id,
+    title: assessment.title,
+    description: assessment.description,
+    config: assessment.config_json || {},
     requireLogin: link.require_login,
     hasAccessCode: !!link.access_code_hash,
-    status: link.status,
+    status: assessment.status,
   });
 }

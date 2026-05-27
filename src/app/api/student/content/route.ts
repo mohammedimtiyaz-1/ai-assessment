@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { supabase } from "@/lib/db";
+import { supabase, getSupabaseAdmin } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { generateQuestions } from "@/lib/ai";
 import { logger } from "@/lib/logger";
@@ -13,8 +13,10 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 
+  const supabaseAdmin = getSupabaseAdmin();
+
   if (id) {
-    const { data: content, error } = await supabase
+    const { data: content, error } = await supabaseAdmin
       .from('content')
       .select('id, title, type, storage_ref, created_at, extracted_content, extraction_status')
       .eq('id', id)
@@ -29,7 +31,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     return NextResponse.json({ content: [content] });
   }
 
-  const { data: content, error } = await supabase
+  const { data: content, error } = await supabaseAdmin
     .from('content')
     .select('id, title, type, storage_ref, created_at')
     .eq('owner_user_id', userId)
@@ -112,7 +114,8 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       }
     }
 
-    const { error: insertError } = await supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    const { error: insertError } = await supabaseAdmin
       .from('content')
       .insert({
         id: contentId,

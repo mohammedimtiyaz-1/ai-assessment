@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { TrendingUp, Target, Zap, BookOpen } from "lucide-react";
+import { ApiError, fetchJson } from "@/lib/fetch-json";
 
 interface ProgressData {
   totalAttempts: number;
@@ -17,15 +19,40 @@ interface ProgressData {
 export default function ProgressPage() {
   const [data, setData] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/student/progress")
-      .then((r) => r.json())
+    let isMounted = true;
+
+    fetchJson<ProgressData>("/api/student/progress")
       .then((d) => {
-        setData(d);
+        if (!isMounted) return;
+
+        setData({
+          totalAttempts: d.totalAttempts ?? 0,
+          averageScore: d.averageScore ?? 0,
+          completionRate: d.completionRate ?? 0,
+          weakAreas: Array.isArray(d.weakAreas) ? d.weakAreas : [],
+          recentTrend: Array.isArray(d.recentTrend) ? d.recentTrend : [],
+        });
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        if (!isMounted) return;
+
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(`/login?callbackUrl=${encodeURIComponent("/student/progress")}`);
+          return;
+        }
+
+        setError(err.message || "Unable to load progress");
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (loading) {
@@ -38,6 +65,17 @@ export default function ProgressPage() {
           ))}
         </div>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border-destructive/30 bg-destructive/5">
+        <CardContent className="py-8 text-center">
+          <h3 className="text-lg font-semibold">Something went wrong</h3>
+          <p className="text-sm text-muted-foreground mt-2">{error}</p>
+        </CardContent>
+      </Card>
     );
   }
 

@@ -1,9 +1,20 @@
 import OpenAI from "openai";
 import { env } from "./env";
+import { logger } from "./logger";
 
-export const openai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-});
+let openaiClient: OpenAI | null = null;
+
+export function getOpenAIClient(): OpenAI {
+  if (!env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required for AI generation");
+  }
+
+  openaiClient ??= new OpenAI({
+    apiKey: env.OPENAI_API_KEY,
+  });
+
+  return openaiClient;
+}
 
 export interface GeneratedQuestion {
   body: string;
@@ -30,6 +41,11 @@ export async function generateQuestions(
   options: GenerateQuestionsOptions = {}
 ): Promise<GeneratedQuestion[]> {
   const questionType = options.questionType || "mcq";
+  const supportedQuestionTypes = ["mcq", "essay", "fill-blanks", "match-following", "riddle", "mixed"];
+
+  if (!supportedQuestionTypes.includes(questionType)) {
+    throw new Error(`Question type "${questionType}" is not yet supported.`);
+  }
 
   const count = options.count || 10;
   const difficulty = options.difficulty || "medium";
@@ -166,11 +182,9 @@ Return ONLY valid JSON in this exact format:
 }`;
 
       userPrompt = `Generate ${count} multiple-choice questions from the following content:\n\n${contentText}`;
-    } else {
-      throw new Error(`Question type "${questionType}" is not yet supported.`);
     }
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAIClient().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
@@ -197,12 +211,12 @@ Return ONLY valid JSON in this exact format:
     const questions = (parsed.questions || []).map((q: GeneratedQuestion) => ({
       ...q,
       questionType: questionType === "mixed" ? "mcq" : questionType,
-      difficulty: q.difficulty || difficulty === "mixed" ? "medium" : difficulty,
+      difficulty: q.difficulty || (difficulty === "mixed" ? "medium" : difficulty),
     }));
 
     return questions;
   } catch (error) {
-    console.error("Error generating questions:", error);
+    logger.error({ error }, "Error generating questions");
     throw new Error("Failed to generate questions");
   }
 }

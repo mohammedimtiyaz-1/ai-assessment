@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 const patchSchema = z.object({
   description: z.string().optional(),
@@ -17,72 +18,72 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const parts = req.nextUrl.pathname.split("/");
   const id = parts[parts.length - 1];
 
-  console.log("Fetching assessment:", { id, userId: user.id, userEmail: user.email, userRole: user.role });
+  logger.info({ id, userId: user.id, userEmail: user.email, userRole: user.role }, "Fetching assessment");
 
-  const result = await query(
-    "SELECT * FROM assessments WHERE id = $1 AND owner_user_id = $2",
-    [id, user.id]
-  );
+  const { data: assessment, error } = await supabase
+    .from('assessments')
+    .select('*')
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+    .single();
   
-  console.log("Assessment query result:", { rowCount: result.rows.length });
-  
-  if (result.rows.length === 0) {
+  if (error || !assessment) {
     // Check if assessment exists at all (without owner check)
-    const checkAny = await query(
-      "SELECT id, title, owner_user_id FROM assessments WHERE id = $1",
-      [id]
-    );
-    console.log("Assessment exists check:", checkAny.rows);
-    return NextResponse.json({ error: "Not found", debug: { userId: user.id, assessmentId: id, assessmentExists: checkAny.rows.length > 0 } }, { status: 404 });
+    const { data: checkAny } = await supabase
+      .from('assessments')
+      .select('id, title, owner_user_id')
+      .eq('id', id)
+      .single();
+    logger.info({ assessmentExists: !!checkAny }, "Assessment exists check");
+    return NextResponse.json({ error: "Not found", debug: { userId: user.id, assessmentId: id, assessmentExists: !!checkAny } }, { status: 404 });
   }
 
-  const assessment = result.rows[0];
-
   // Fetch question count
-  const questionsRes = await query(
-    "SELECT COUNT(*) as count FROM assessment_questions WHERE assessment_id = $1",
-    [id]
-  );
-  const questionCount = parseInt(questionsRes.rows[0].count);
+  const { count: questionCount } = await supabase
+    .from('assessment_questions')
+    .select('*', { count: 'exact', head: true })
+    .eq('assessment_id', id);
 
   // Fetch submission count
-  const submissionsRes = await query(
-    `SELECT COUNT(*) as count FROM quiz_sessions 
-     WHERE assessment_id = $1 AND status = 'completed'`,
-    [id]
-  );
-  const submissionCount = parseInt(submissionsRes.rows[0].count);
+  const { count: submissionCount } = await supabase
+    .from('quiz_sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('assessment_id', id)
+    .eq('status', 'completed');
 
   // Fetch joined count (students who started but not completed)
-  const joinedRes = await query(
-    `SELECT COUNT(*) as count FROM quiz_sessions 
-     WHERE assessment_id = $1 AND status = 'in_progress'`,
-    [id]
-  );
-  const joinedCount = parseInt(joinedRes.rows[0].count);
+  const { count: joinedCount } = await supabase
+    .from('quiz_sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('assessment_id', id)
+    .eq('status', 'in_progress');
 
   // Fetch linked content
-  const linkedContentRes = await query(
-    `SELECT c.id, c.title, c.type 
-     FROM assessment_content ac
-     JOIN content c ON ac.content_id = c.id
-     WHERE ac.assessment_id = $1`,
-    [id]
-  );
+  const { data: linkedContent } = await supabase
+    .from('assessment_content')
+    .select('content!inner(id, title, type)')
+    .eq('assessment_id', id);
 
-  const linksRes = await query(
-    "SELECT token, access_code, active FROM assessment_links WHERE assessment_id = $1",
-    [id]
-  );
+  const { data: links } = await supabase
+    .from('assessment_links')
+    .select('token, active')
+    .eq('assessment_id', id);
 
   return NextResponse.json({
-    ...assessment,
-    config: assessment.config_json,
-    linkedContent: linkedContentRes.rows,
-    links: linksRes.rows,
-    questionCount,
-    submissionCount,
-    joinedCount,
+    id: (assessment as any).id,
+    title: (assessment as any).title,
+    description: (assessment as any).description,
+    ai_note: (assessment as any).ai_note,
+    config_json: (assessment as any).config_json,
+    status: (assessment as any).status,
+    created_at: (assessment as any).created_at,
+    owner_user_id: (assessment as any).owner_user_id,
+    config: (assessment as any).config_json,
+    linkedContent: (linkedContent || []).map((lc: any) => lc.content),
+    links: links || [],
+    questionCount: questionCount || 0,
+    submissionCount: submissionCount || 0,
+    joinedCount: joinedCount || 0,
   });
 });
 
@@ -103,10 +104,17 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
 
   const { description, aiNote } = parsed.data;
 
-  await query(
-    "UPDATE assessments SET description = COALESCE($1, description), ai_note = COALESCE($2, ai_note) WHERE id = $3 AND owner_user_id = $4",
-    [description || null, aiNote || null, id, user.id]
-  );
+  const { error } = await (supabase.from('assessments') as any)
+    .update({
+      description: description || null,
+      ai_note: aiNote || null
+    })
+    .eq('id', id)
+    .eq('owner_user_id', user.id);
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to update assessment" }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 });

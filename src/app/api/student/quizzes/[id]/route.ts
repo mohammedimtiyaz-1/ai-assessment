@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase, getSupabaseAdmin } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
 export const GET = withAuth(async (req: NextRequest, user) => {
@@ -14,34 +14,34 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       return NextResponse.json({ error: "Quiz configuration ID is required" }, { status: 400 });
     }
 
-    // Fetch quiz configuration
-    const quizConfigRes = await query(
-      `SELECT qc.*, c.title as content_title, c.type as content_type
-       FROM quiz_configurations qc
-       JOIN content c ON qc.content_id = c.id
-       WHERE qc.id = $1 AND c.owner_user_id = $2`,
-      [id, user.id]
-    );
+    const supabaseAdmin = getSupabaseAdmin();
 
-    if (quizConfigRes.rows.length === 0) {
+    // Fetch quiz configuration
+    const { data: quizConfig, error } = await supabaseAdmin
+      .from('quiz_configurations')
+      .select('*, content!inner(title, type, owner_user_id)')
+      .eq('id', id)
+      .eq('content.owner_user_id', user.id)
+      .single();
+
+    if (error || !quizConfig) {
+      logger.error({ error, id, userId: user.id }, "Quiz configuration not found");
       return NextResponse.json({ error: "Quiz configuration not found" }, { status: 404 });
     }
-
-    const quizConfig = quizConfigRes.rows[0];
 
     logger.info({ quizConfigId: id, userId: user.id }, "Quiz configuration fetched");
 
     return NextResponse.json({
       quizConfig: {
-        id: quizConfig.id,
-        content_id: quizConfig.content_id,
-        content_title: quizConfig.content_title,
-        content_type: quizConfig.content_type,
-        difficulty: quizConfig.difficulty,
-        question_type: quizConfig.question_type,
-        question_count: quizConfig.question_count,
-        question_ids: quizConfig.question_ids,
-        generated_at: quizConfig.generated_at,
+        id: (quizConfig as any).id,
+        content_id: (quizConfig as any).content_id,
+        content_title: ((quizConfig as any).content as any)?.title,
+        content_type: ((quizConfig as any).content as any)?.type,
+        difficulty: (quizConfig as any).difficulty,
+        question_type: (quizConfig as any).question_type,
+        question_count: (quizConfig as any).question_count,
+        question_ids: (quizConfig as any).question_ids,
+        generated_at: (quizConfig as any).generated_at,
       },
     });
 

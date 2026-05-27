@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,8 @@ import { Upload, File, CheckCircle, Loader2, FileText } from "lucide-react";
 
 export default function UploadPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const [authChecked, setAuthChecked] = useState(false);
   const [uploadType, setUploadType] = useState<"file" | "text">("file");
   const [file, setFile] = useState<File | null>(null);
   const [textContent, setTextContent] = useState("");
@@ -24,6 +27,15 @@ export default function UploadPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+
+  // Check authentication on mount
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push(`/login?callbackUrl=/student/upload`);
+    } else if (status === "authenticated") {
+      setAuthChecked(true);
+    }
+  }, [status, router]);
 
   const onDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -89,6 +101,22 @@ export default function UploadPage() {
       setUploading(false);
       setGenerating(false);
     }
+  }
+
+  // Show loading while checking auth
+  if (status === "loading" || !authChecked) {
+    return (
+      <div className="mx-auto max-w-xl">
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Checking authentication...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

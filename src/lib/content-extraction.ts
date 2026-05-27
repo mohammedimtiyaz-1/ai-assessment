@@ -1,6 +1,6 @@
 import Tesseract from 'tesseract.js';
 import { logger } from './logger';
-import { openai } from './ai';
+import { getOpenAIClient } from './ai';
 
 // Dynamic import for pdf-parse to avoid import issues
 const pdf = require('pdf-parse');
@@ -65,7 +65,7 @@ export async function extractImageContent(buffer: Buffer, mimeType: string): Pro
     
     const base64Image = buffer.toString('base64');
     
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAIClient().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {

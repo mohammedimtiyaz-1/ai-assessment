@@ -1,37 +1,43 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { supabase, getSupabaseAdmin } from "@/lib/db";
 
 export async function GET(_req: Request, { params }: { params: { sessionId: string } }) {
-  const result = await query(
-    `SELECT s.id, s.constraints_json, s.question_ids, s.started_at, s.status, s.user_id, s.guest_name
-     FROM quiz_sessions s WHERE s.id = $1`,
-    [params.sessionId]
-  );
-  if (result.rows.length === 0) {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  const { data: session, error: sessionError } = await supabaseAdmin
+    .from('quiz_sessions')
+    .select('id, constraints_json, question_ids, started_at, status, user_id, guest_name')
+    .eq('id', params.sessionId)
+    .single();
+
+  if (sessionError || !session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const session = result.rows[0];
-  if (session.status !== "active") {
+  if ((session as any).status !== "active") {
     return NextResponse.json({ error: "Session expired" }, { status: 410 });
   }
 
-  const questionsRes = await query(
-    `SELECT id, body, answers_json as answers FROM questions WHERE id = ANY($1)`,
-    [session.question_ids]
-  );
+  const { data: questions, error: questionsError } = await supabaseAdmin
+    .from('questions')
+    .select('id, body, answers_json')
+    .in('id', (session as any).question_ids as string[]);
 
-  const questions = questionsRes.rows.map((q) => ({
+  if (questionsError) {
+    return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 });
+  }
+
+  const questionsMapped = (questions || []).map((q: any) => ({
     id: q.id,
     body: q.body,
-    answers: q.answers || [],
+    answers: typeof q.answers_json === 'string' ? JSON.parse(q.answers_json) : (q.answers_json || []),
   }));
 
   return NextResponse.json({
-    id: session.id,
-    questions,
-    timeLimitSec: session.constraints_json?.timeLimitSec || null,
-    status: session.status,
-    startedAt: session.started_at,
+    id: (session as any).id,
+    questions: questionsMapped,
+    timeLimitSec: ((session as any).constraints_json as any)?.timeLimitSec || null,
+    status: (session as any).status,
+    startedAt: (session as any).started_at,
   });
 }

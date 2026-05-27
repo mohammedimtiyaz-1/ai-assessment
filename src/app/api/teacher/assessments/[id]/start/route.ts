@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export const POST = withAuth(async (req: NextRequest, user) => {
   const role = user.role;
@@ -12,24 +13,28 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   const id = parts[parts.length - 2]; // Get the id before "start"
 
   // Check if assessment has questions
-  const aqRes = await query(
-    "SELECT question_id FROM assessment_questions WHERE assessment_id = $1 ORDER BY position",
-    [id]
-  );
-  const questionIds = aqRes.rows.map((r: any) => r.question_id);
+  const { data: aqData } = await supabase
+    .from('assessment_questions')
+    .select('question_id')
+    .eq('assessment_id', id)
+    .order('position', { ascending: true });
+  
+  const questionIds = (aqData || []).map((r: any) => r.question_id);
   if (questionIds.length === 0) {
-    console.log("Cannot start assessment: No questions available");
+    logger.warn({ assessmentId: id }, "Cannot start assessment: No questions available");
     return NextResponse.json({ error: "Cannot start assessment: No questions available" }, { status: 400 });
   }
 
-  const result = await query(
-    "UPDATE assessments SET status = 'started' WHERE id = $1 AND owner_user_id = $2 RETURNING *",
-    [id, user.id]
-  );
+  const { data: result, error } = await (supabase.from('assessments') as any)
+    .update({ status: 'started' })
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+    .select()
+    .single();
 
-  if (result.rows.length === 0) {
+  if (error || !result) {
     return NextResponse.json({ error: "Assessment not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, assessment: result.rows[0] });
+  return NextResponse.json({ success: true, assessment: result });
 });

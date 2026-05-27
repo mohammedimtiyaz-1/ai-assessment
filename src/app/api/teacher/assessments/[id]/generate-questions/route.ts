@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import { generateQuestions } from "@/lib/ai";
 import { randomUUID } from "crypto";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -16,30 +17,31 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   const id = parts[parts.length - 2];
 
   // Verify ownership
-  const assessmentCheck = await query(
-    "SELECT id FROM assessments WHERE id = $1 AND owner_user_id = $2",
-    [id, user.id]
-  );
-  if (assessmentCheck.rows.length === 0) {
+  const { data: assessmentCheck } = await supabase
+    .from('assessments')
+    .select('id')
+    .eq('id', id)
+    .eq('owner_user_id', user.id)
+    .single();
+  
+  if (!assessmentCheck) {
     return NextResponse.json({ error: "Assessment not found" }, { status: 404 });
   }
 
   // Fetch linked content
-  const linkedContentRes = await query(
-    `SELECT c.id, c.title, c.type, c.storage_ref 
-     FROM assessment_content ac
-     JOIN content c ON ac.content_id = c.id
-     WHERE ac.assessment_id = $1`,
-    [id]
-  );
+  const { data: linkedContent } = await supabase
+    .from('assessment_content')
+    .select('content!inner(id, title, type, storage_ref)')
+    .eq('assessment_id', id);
 
-  if (linkedContentRes.rows.length === 0) {
+  if (!linkedContent || linkedContent.length === 0) {
     return NextResponse.json({ error: "No content attached to this assessment" }, { status: 400 });
   }
 
   // Generate questions from each attached content
   let totalQuestionsGenerated = 0;
-  for (const content of linkedContentRes.rows) {
+  for (const item of linkedContent) {
+    const content = (item as any).content;
     try {
       // Use storage_ref for content text - this contains the actual text content
       // For text content, it's the text itself; for files, it's the extracted text
@@ -51,7 +53,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       }
 
       if (!contentText.trim()) {
-        console.log(`Skipping content ${content.id}: no text available`);
+        logger.warn({ contentId: content.id }, "Skipping content: no text available");
         continue;
       }
 
@@ -63,32 +65,50 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         const questionId = randomUUID();
         
         // Insert question
-        await query(
-          `INSERT INTO questions (id, source_content_id, body, answers_json, correct_answer_key, difficulty)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [questionId, content.id, q.body, JSON.stringify(q.answers), q.correctAnswer, q.difficulty || "medium"]
-        );
+        const { error: insertError } = await supabase
+          .from('questions')
+          .insert({
+            id: questionId,
+            source_content_id: content.id,
+            body: q.body,
+            answers_json: JSON.stringify(q.answers),
+            correct_answer_key: q.correctAnswer,
+            difficulty: q.difficulty || "medium"
+          } as any);
+
+        if (insertError) {
+          logger.error({ error: insertError }, "Failed to insert question");
+        }
 
         // Link question to assessment
-        await query(
-          `INSERT INTO assessment_questions (assessment_id, question_id, position)
-           VALUES ($1, $2, $3)`,
-          [id, questionId, totalQuestionsGenerated]
-        );
+        const { error: linkError } = await supabase
+          .from('assessment_questions')
+          .insert({
+            assessment_id: id,
+            question_id: questionId,
+            position: totalQuestionsGenerated
+          } as any);
+
+        if (linkError) {
+          logger.error({ error: linkError }, "Failed to link question to assessment");
+        }
 
         totalQuestionsGenerated++;
       }
     } catch (error) {
-      console.error(`Failed to generate questions for content ${content.id}:`, error);
+      logger.error({ error, contentId: content.id }, "Failed to generate questions for content");
     }
   }
 
   // Update assessment status to published if questions were generated
   if (totalQuestionsGenerated > 0) {
-    await query(
-      "UPDATE assessments SET status = 'published' WHERE id = $1",
-      [id]
-    );
+    const { error: updateError } = await (supabase.from('assessments') as any)
+      .update({ status: 'published' })
+      .eq('id', id);
+
+    if (updateError) {
+      logger.error({ error: updateError }, "Failed to update assessment status");
+    }
   }
 
   return NextResponse.json({ success: true, questionsGenerated: totalQuestionsGenerated });

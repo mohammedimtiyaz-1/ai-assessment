@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken, decode } from "next-auth/jwt";
-import { query } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import { env } from "@/lib/env";
 
 export async function GET(req: NextRequest) {
+  if (env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const secret = env.NEXTAUTH_SECRET;
+  if (!secret) {
+    return NextResponse.json({ error: "NEXTAUTH_SECRET is not configured" }, { status: 503 });
+  }
+
   const cookieHeader = req.headers.get("cookie") || "";
   const cookies = Object.fromEntries(
     cookieHeader.split("; ").map((c) => c.split("=")).map(([k, ...v]) => [k, v.join("=")])
@@ -11,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   const rawToken = await getToken({
     req: req as any,
-    secret: env.NEXTAUTH_SECRET,
+    secret,
     cookieName: "next-auth.session-token",
     secureCookie: false,
     raw: true,
@@ -23,27 +32,39 @@ export async function GET(req: NextRequest) {
     if (rawToken) {
       decodedToken = await decode({
         token: rawToken,
-        secret: env.NEXTAUTH_SECRET,
+        secret,
       });
     }
   } catch (e: any) {
     decodeError = e.message;
   }
 
-  const dbNameRes = await query("SELECT current_database() as db");
-  const tablesRes = await query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name");
+  // Get database name using Supabase client
+  const { data: dbNameData } = await supabase.rpc('current_database');
+  const dbName = dbNameData || 'unknown';
+  
+  // Get tables using Supabase client
+  const { data: tablesData } = await supabase
+    .from('information_schema.tables')
+    .select('table_name')
+    .eq('table_schema', 'public')
+    .order('table_name');
+  
+  const tables = (tablesData || []).map((r: any) => r.table_name);
 
   let contentQueryResult = null;
   let contentQueryError = null;
   try {
-    const r = await query("SELECT COUNT(*) as count FROM content WHERE owner_user_id = '00000000-0000-0000-0000-000000000000'");
-    contentQueryResult = r.rows[0].count;
+    const { count } = await supabase
+      .from('content')
+      .select('*', { count: 'exact', head: true })
+      .eq('owner_user_id', '00000000-0000-0000-0000-000000000000');
+    contentQueryResult = count;
   } catch (e: any) {
     contentQueryError = e.message;
   }
 
-  const pool = (query as any).pool || (globalThis as any).__dbPool;
-  const connStr = pool?.options?.connectionString || env.DATABASE_URL;
+  const connStr = env.DATABASE_URL ? env.DATABASE_URL.replace(/\/\/[^:]+:[^@]+@/, '//***:***@') : null;
 
   return NextResponse.json({
     cookies,
@@ -51,10 +72,10 @@ export async function GET(req: NextRequest) {
     decodedTokenExists: !!decodedToken,
     decodeError,
     decodedToken,
-    db: dbNameRes.rows[0].db,
-    tables: tablesRes.rows.map((r: any) => r.table_name),
+    db: dbName,
+    tables,
     contentQueryResult,
     contentQueryError,
-    connStr: connStr ? connStr.replace(/\/\/[^:]+:[^@]+@/, '//***:***@') : null,
+    connStr,
   });
 }

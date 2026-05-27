@@ -7,13 +7,20 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    exclude: ["node_modules", "tests/**", "playwright-report/**", "test-results/**"],
     setupFiles: [],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
+      all: false,
       exclude: [
         "node_modules/",
-        "src/app/",
+        ".next/",
+        "coverage/",
+        "playwright-report/",
+        "test-results/",
+        "src/**/__tests__/**",
         "src/components/ui/",
         "*.config.*",
         "*.test.ts",
